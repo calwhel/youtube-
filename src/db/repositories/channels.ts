@@ -2,10 +2,12 @@ import type { PoolClient } from "pg";
 
 import { encrypt, decrypt } from "../../utils/crypto";
 import type {
+  AudienceLevel,
   ChannelPublicView,
   ChannelRecord,
   ChannelStatsRecord,
   CreateChannelInput,
+  TitleStyle,
   UpdateChannelInput,
 } from "../../types/channel";
 import { query, queryOne } from "../pool";
@@ -24,6 +26,13 @@ function mapChannelPublic(
     upload_frequency: channel.upload_frequency,
     monthly_budget_usd: Number(channel.monthly_budget_usd),
     status: channel.status,
+    target_duration_minutes: channel.target_duration_minutes,
+    audience_level: channel.audience_level,
+    title_style: channel.title_style,
+    auto_publish: channel.auto_publish,
+    youtube_category_id: channel.youtube_category_id,
+    creatomate_thumbnail_template_id: channel.creatomate_thumbnail_template_id,
+    require_thumbnail: channel.require_thumbnail,
     created_at: channel.created_at.toISOString(),
     stats: stats
       ? {
@@ -123,9 +132,16 @@ export class ChannelRepository {
         creatomate_template_id,
         upload_frequency,
         monthly_budget_usd,
-        status
+        status,
+        target_duration_minutes,
+        audience_level,
+        title_style,
+        auto_publish,
+        youtube_category_id,
+        creatomate_thumbnail_template_id,
+        require_thumbnail
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
       `,
       [
@@ -139,6 +155,13 @@ export class ChannelRepository {
         input.upload_frequency ?? "0 14 * * *",
         input.monthly_budget_usd ?? 0,
         input.status ?? "paused",
+        input.target_duration_minutes ?? 10,
+        input.audience_level ?? "general",
+        input.title_style ?? "curiosity",
+        input.auto_publish ?? false,
+        input.youtube_category_id ?? "28",
+        input.creatomate_thumbnail_template_id ?? null,
+        input.require_thumbnail ?? true,
       ],
     );
 
@@ -180,7 +203,14 @@ export class ChannelRepository {
         creatomate_template_id = COALESCE($8, creatomate_template_id),
         upload_frequency = COALESCE($9, upload_frequency),
         monthly_budget_usd = COALESCE($10, monthly_budget_usd),
-        status = COALESCE($11, status)
+        status = COALESCE($11, status),
+        target_duration_minutes = COALESCE($12, target_duration_minutes),
+        audience_level = COALESCE($13, audience_level),
+        title_style = COALESCE($14, title_style),
+        auto_publish = COALESCE($15, auto_publish),
+        youtube_category_id = COALESCE($16, youtube_category_id),
+        creatomate_thumbnail_template_id = COALESCE($17, creatomate_thumbnail_template_id),
+        require_thumbnail = COALESCE($18, require_thumbnail)
       WHERE id = $1
       RETURNING *
       `,
@@ -200,6 +230,13 @@ export class ChannelRepository {
         input.upload_frequency ?? null,
         input.monthly_budget_usd ?? null,
         input.status ?? null,
+        input.target_duration_minutes ?? null,
+        input.audience_level ?? null,
+        input.title_style ?? null,
+        input.auto_publish ?? null,
+        input.youtube_category_id ?? null,
+        input.creatomate_thumbnail_template_id ?? null,
+        input.require_thumbnail ?? null,
       ],
     );
 
@@ -271,4 +308,14 @@ export class ChannelRepository {
 
     await query(sql, params);
   }
+}
+
+export function isAudienceLevel(value: string): value is AudienceLevel {
+  return ["beginner", "intermediate", "advanced", "general"].includes(value);
+}
+
+export function isTitleStyle(value: string): value is TitleStyle {
+  return ["curiosity", "question", "listicle", "story", "controversy"].includes(
+    value,
+  );
 }

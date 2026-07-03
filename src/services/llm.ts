@@ -5,8 +5,9 @@ import type { VideoPayload } from "../types/video";
 import { withRetry } from "../utils/tmp";
 
 function buildSystemPrompt(
-  nichePrompt: string,
+  config: ServiceConfig,
   excludedTopics: string[],
+  selectedTopic: string,
 ): string {
   const exclusionBlock =
     excludedTopics.length > 0
@@ -15,9 +16,21 @@ function buildSystemPrompt(
           .join("\n")}`
       : "";
 
-  return `You are a YouTube video script generator for a channel with this niche and style:
+  const targetWords = config.content.targetDurationMinutes * 150;
+  const minWords = Math.floor(targetWords * 0.85);
+  const maxWords = Math.ceil(targetWords * 1.15);
 
-${nichePrompt}
+  return `You are an elite YouTube scriptwriter optimized for CTR, retention, and watch time.
+
+Channel niche and style:
+${config.nichePrompt}
+
+Audience level: ${config.content.audienceLevel}
+Title style preference: ${config.content.titleStyle}
+Target runtime: ${config.content.targetDurationMinutes} minutes (~${minWords}-${maxWords} total voiceover words)
+
+Selected episode topic (build the entire video around this):
+${selectedTopic}
 
 Return ONLY a single minified valid JSON object with no markdown, no code fences, and no commentary.
 
@@ -29,6 +42,7 @@ interface VideoPayload {
   tags: string[];
   thumbnail_prompt: string;
   thumbnail_text: string;
+  chapters: Array<{ timestamp: string; title: string }>;
   scenes: Array<{
     voiceover_text: string;
     visual_prompt: string;
@@ -36,16 +50,31 @@ interface VideoPayload {
   }>;
 }
 
-Rules:
-- topic: a specific, fresh episode topic within the channel niche (one concise sentence)
-- title: compelling, under 100 characters
-- description: 2-4 paragraphs with SEO-friendly copy and a call to action
-- tags: 8-15 relevant tags
-- thumbnail_prompt: vivid image prompt for thumbnail generation
-- thumbnail_text: short bold text for thumbnail overlay (max 6 words)
-- scenes: 5-8 scenes; each voiceover_text 2-4 sentences; visual_prompt describes the scene imagery; overlay_text is a short on-screen caption
-- Stay strictly within the channel niche and tone
-- Output must be parseable JSON only${exclusionBlock}`;
+Retention and packaging rules:
+- topic: must match the selected episode topic above (one concise sentence)
+- title: 40-65 characters, high CTR, matches title style "${config.content.titleStyle}" — use curiosity gap, specificity, or a bold claim (no clickbait lies)
+- description: 2-4 SEO paragraphs PLUS a subscribe CTA; write for humans first
+- tags: 10-15 high-intent tags mixing broad and long-tail
+- thumbnail_prompt: bold, high-contrast, single focal subject, readable at mobile size, no clutter
+- thumbnail_text: max 4 words, ALL CAPS friendly, complements (does not duplicate) the title
+- chapters: 4-8 entries with MM:SS timestamps starting at 00:00; align to scene boundaries
+- scenes: 6-10 scenes
+
+Script structure (critical for retention):
+1. Scene 1 HOOK (first ~40 words): open a curiosity loop — bold claim, surprising fact, or "what if" — speak directly to the viewer
+2. Scenes 2-3: deliver on the hook promise quickly; add stakes
+3. Middle scenes: pattern interrupts every 45-60 seconds — "But here's where it gets strange...", mini-reveals, contrast, or rhetorical questions
+4. Penultimate scene: biggest payoff / climax
+5. Final scene: strong conclusion + subscribe CTA + tease related topic
+
+Per-scene rules:
+- voiceover_text: 2-5 sentences, conversational, paced for spoken delivery
+- visual_prompt: cinematic, specific, matches voiceover beat (documentary/stock style)
+- overlay_text: 3-6 words max for on-screen emphasis
+
+Total voiceover word count MUST land between ${minWords} and ${maxWords} words.
+Stay strictly within the channel niche and tone.
+Output must be parseable JSON only.${exclusionBlock}`;
 }
 
 function extractJsonObject(raw: string): string {
@@ -97,6 +126,10 @@ function assertVideoPayload(value: unknown): VideoPayload {
     throw new Error("LLM payload missing or invalid field: scenes");
   }
 
+  if (payload.chapters !== undefined && !Array.isArray(payload.chapters)) {
+    throw new Error("LLM payload invalid field: chapters");
+  }
+
   for (const [index, scene] of payload.scenes.entries()) {
     if (!scene || typeof scene !== "object") {
       throw new Error(`Scene ${index} is not an object`);
@@ -116,7 +149,7 @@ function assertVideoPayload(value: unknown): VideoPayload {
 }
 
 export interface GenerateScriptOptions {
-  topic?: string;
+  selectedTopic: string;
   excludedTopics?: string[];
 }
 
@@ -129,29 +162,25 @@ export class LlmService {
     this.client = new Anthropic({ apiKey: config.anthropic.apiKey });
   }
 
-  async generateScript(
-    options: GenerateScriptOptions = {},
-  ): Promise<VideoPayload> {
+  async generateScript(options: GenerateScriptOptions): Promise<VideoPayload> {
     const excludedTopics = options.excludedTopics ?? [];
     const systemPrompt = buildSystemPrompt(
-      this.config.nichePrompt,
+      this.config,
       excludedTopics,
+      options.selectedTopic,
     );
-    const userPrompt = options.topic?.trim()
-      ? `Generate a complete VideoPayload JSON for this specific topic: ${options.topic.trim()}`
-      : "Generate a complete VideoPayload JSON choosing a fresh topic within the channel niche.";
 
     return withRetry(
       async () => {
         const response = await this.client.messages.create({
           model: this.config.anthropic.model,
-          max_tokens: 4096,
-          temperature: 0.7,
+          max_tokens: 8192,
+          temperature: 0.65,
           system: systemPrompt,
           messages: [
             {
               role: "user",
-              content: userPrompt,
+              content: `Write a complete retention-optimized VideoPayload JSON for the topic: ${options.selectedTopic}`,
             },
           ],
         });
@@ -166,10 +195,7 @@ export class LlmService {
         const jsonString = extractJsonObject(textBlock.text);
         const parsed = JSON.parse(jsonString) as unknown;
         const payload = assertVideoPayload(parsed);
-
-        if (options.topic?.trim()) {
-          payload.topic = options.topic.trim();
-        }
+        payload.topic = options.selectedTopic.trim();
 
         return payload;
       },

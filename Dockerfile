@@ -16,7 +16,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV TMP_DIR=/tmp
 
-RUN addgroup -g 1001 -S nodejs && adduser -S pipeline -u 1001 -G nodejs
+RUN apk add --no-cache ffmpeg wget \
+  && addgroup -g 1001 -S nodejs \
+  && adduser -S pipeline -u 1001 -G nodejs
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules

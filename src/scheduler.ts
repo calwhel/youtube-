@@ -5,14 +5,16 @@ import { ChannelRepository } from "./db/repositories/channels";
 import { bootstrapSchema } from "./db/pool";
 import type { PipelineOrchestrator } from "./pipeline";
 import { runPipelineForChannel } from "./routes/pipeline";
+import { AnalyticsSyncService } from "./services/analytics-sync";
 
 export class ChannelScheduler {
   private readonly channels: ChannelRepository;
   private readonly jobs = new Map<string, ScheduledTask>();
   private reloadTask: ScheduledTask | null = null;
+  private analyticsTask: ScheduledTask | null = null;
 
   constructor(
-    platform: PlatformConfig,
+    private readonly platform: PlatformConfig,
     private readonly orchestrator: PipelineOrchestrator,
   ) {
     this.channels = new ChannelRepository(platform.encryptionKey);
@@ -26,15 +28,35 @@ export class ChannelScheduler {
       void this.reloadJobs();
     });
 
-    console.log("[scheduler] started; reloading channel cron jobs every 5 minutes");
+    this.analyticsTask = cron.schedule("0 3 * * *", () => {
+      void this.runAnalyticsSync();
+    });
+
+    console.log(
+      "[scheduler] started; channel cron reload every 5m, analytics sync daily at 03:00 UTC",
+    );
   }
 
   async stop(): Promise<void> {
     this.reloadTask?.stop();
+    this.analyticsTask?.stop();
     for (const job of this.jobs.values()) {
       job.stop();
     }
     this.jobs.clear();
+  }
+
+  private async runAnalyticsSync(): Promise<void> {
+    try {
+      const sync = new AnalyticsSyncService(this.platform);
+      const result = await sync.syncAll();
+      console.log(
+        `[scheduler] analytics sync complete: ${result.videosUpdated} videos updated, ${result.errors.length} errors`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[scheduler] analytics sync failed: ${message}`);
+    }
   }
 
   private async reloadJobs(): Promise<void> {

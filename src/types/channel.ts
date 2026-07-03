@@ -1,5 +1,18 @@
 export type ChannelStatus = "active" | "paused";
 
+export type AudienceLevel =
+  | "beginner"
+  | "intermediate"
+  | "advanced"
+  | "general";
+
+export type TitleStyle =
+  | "curiosity"
+  | "question"
+  | "listicle"
+  | "story"
+  | "controversy";
+
 export interface ChannelRecord {
   id: string;
   name: string;
@@ -12,6 +25,13 @@ export interface ChannelRecord {
   upload_frequency: string;
   monthly_budget_usd: string;
   status: ChannelStatus;
+  target_duration_minutes: number;
+  audience_level: AudienceLevel;
+  title_style: TitleStyle;
+  auto_publish: boolean;
+  youtube_category_id: string;
+  creatomate_thumbnail_template_id: string | null;
+  require_thumbnail: boolean;
   created_at: Date;
 }
 
@@ -35,6 +55,13 @@ export interface CreateChannelInput {
   upload_frequency?: string;
   monthly_budget_usd?: number;
   status?: ChannelStatus;
+  target_duration_minutes?: number;
+  audience_level?: AudienceLevel;
+  title_style?: TitleStyle;
+  auto_publish?: boolean;
+  youtube_category_id?: string;
+  creatomate_thumbnail_template_id?: string;
+  require_thumbnail?: boolean;
 }
 
 export interface UpdateChannelInput {
@@ -48,6 +75,13 @@ export interface UpdateChannelInput {
   upload_frequency?: string;
   monthly_budget_usd?: number;
   status?: ChannelStatus;
+  target_duration_minutes?: number;
+  audience_level?: AudienceLevel;
+  title_style?: TitleStyle;
+  auto_publish?: boolean;
+  youtube_category_id?: string;
+  creatomate_thumbnail_template_id?: string | null;
+  require_thumbnail?: boolean;
 }
 
 export interface ChannelPublicView {
@@ -60,6 +94,13 @@ export interface ChannelPublicView {
   upload_frequency: string;
   monthly_budget_usd: number;
   status: ChannelStatus;
+  target_duration_minutes: number;
+  audience_level: AudienceLevel;
+  title_style: TitleStyle;
+  auto_publish: boolean;
+  youtube_category_id: string;
+  creatomate_thumbnail_template_id: string | null;
+  require_thumbnail: boolean;
   created_at: string;
   stats: {
     subs_count: number;
@@ -67,4 +108,12 @@ export interface ChannelPublicView {
     monetization_eligible: boolean;
     last_checked_at: string | null;
   } | null;
+}
+
+export interface ContentSettings {
+  targetDurationMinutes: number;
+  audienceLevel: AudienceLevel;
+  titleStyle: TitleStyle;
+  autoPublish: boolean;
+  requireThumbnail: boolean;
 }

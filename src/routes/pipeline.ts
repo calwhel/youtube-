@@ -5,6 +5,7 @@ import type { PlatformConfig } from "../config";
 import { ChannelRepository } from "../db/repositories/channels";
 import { VideoRepository } from "../db/repositories/videos";
 import type { PipelineOrchestrator } from "../pipeline";
+import { AnalyticsSyncService } from "../services/analytics-sync";
 import { YouTubeService } from "../services/youtube";
 
 const runningChannels = new Set<string>();
@@ -114,45 +115,36 @@ export function createPipelineRoutes(
   });
 
   router.get("/monetization", async (_req, res) => {
+    const sync = new AnalyticsSyncService(platform);
+    const result = await sync.syncAll();
+
     const channelList = await channels.listAll();
-    const results = [];
+    const results = channelList.map((channel) => ({
+      channel_id: channel.id,
+      channel_name: channel.name,
+      subs_count: channel.stats?.subs_count ?? 0,
+      watch_hours_total: channel.stats?.watch_hours_total ?? 0,
+      monetization_eligible: channel.stats?.monetization_eligible ?? false,
+    }));
 
-    for (const channel of channelList) {
-      const decrypted = await channels.findDecryptedById(channel.id);
-      if (!decrypted) {
-        continue;
-      }
+    res.status(200).json({
+      channels: results,
+      sync: {
+        videos_updated: result.videosUpdated,
+        errors: result.errors,
+      },
+    });
+  });
 
-      try {
-        const serviceConfig = buildServiceConfig(platform, decrypted);
-        const youtube = new YouTubeService(serviceConfig);
-        const stats = await youtube.fetchMonetizationStats();
-
-        await channels.upsertStats(channel.id, {
-          subs_count: stats.subsCount,
-          watch_hours_total: stats.watchHoursTotal,
-          monetization_eligible: stats.monetizationEligible,
-        });
-
-        results.push({
-          channel_id: channel.id,
-          channel_name: channel.name,
-          subs_count: stats.subsCount,
-          watch_hours_total: stats.watchHoursTotal,
-          monetization_eligible: stats.monetizationEligible,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        results.push({
-          channel_id: channel.id,
-          channel_name: channel.name,
-          error: message,
-          stats: channel.stats,
-        });
-      }
+  router.post("/analytics/sync", async (_req, res) => {
+    try {
+      const sync = new AnalyticsSyncService(platform);
+      const result = await sync.syncAll();
+      res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ success: false, error: message });
     }
-
-    res.status(200).json({ channels: results });
   });
 }
 

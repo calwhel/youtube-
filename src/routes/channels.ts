@@ -1,11 +1,29 @@
 import type { Request, Response, Router } from "express";
 
 import type { PlatformConfig } from "../config";
-import { ChannelRepository } from "../db/repositories/channels";
+import {
+  ChannelRepository,
+  isAudienceLevel,
+  isTitleStyle,
+} from "../db/repositories/channels";
 import type {
   CreateChannelInput,
   UpdateChannelInput,
 } from "../types/channel";
+
+function parseOptionalBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return undefined;
+}
+
+function parseOptionalNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  return undefined;
+}
 
 function parseCreateChannelBody(body: unknown): CreateChannelInput {
   if (!body || typeof body !== "object") {
@@ -29,6 +47,22 @@ function parseCreateChannelBody(body: unknown): CreateChannelInput {
     }
   }
 
+  if (
+    record.audience_level !== undefined &&
+    (typeof record.audience_level !== "string" ||
+      !isAudienceLevel(record.audience_level))
+  ) {
+    throw new Error("Invalid field: audience_level");
+  }
+
+  if (
+    record.title_style !== undefined &&
+    (typeof record.title_style !== "string" ||
+      !isTitleStyle(record.title_style))
+  ) {
+    throw new Error("Invalid field: title_style");
+  }
+
   return {
     name: (record.name as string).trim(),
     niche_prompt: (record.niche_prompt as string).trim(),
@@ -41,14 +75,32 @@ function parseCreateChannelBody(body: unknown): CreateChannelInput {
       typeof record.upload_frequency === "string"
         ? record.upload_frequency.trim()
         : undefined,
-    monthly_budget_usd:
-      typeof record.monthly_budget_usd === "number"
-        ? record.monthly_budget_usd
-        : undefined,
+    monthly_budget_usd: parseOptionalNumber(record.monthly_budget_usd),
     status:
       record.status === "active" || record.status === "paused"
         ? record.status
         : undefined,
+    target_duration_minutes: parseOptionalNumber(record.target_duration_minutes),
+    audience_level:
+      typeof record.audience_level === "string" &&
+      isAudienceLevel(record.audience_level)
+        ? record.audience_level
+        : undefined,
+    title_style:
+      typeof record.title_style === "string" &&
+      isTitleStyle(record.title_style)
+        ? record.title_style
+        : undefined,
+    auto_publish: parseOptionalBoolean(record.auto_publish),
+    youtube_category_id:
+      typeof record.youtube_category_id === "string"
+        ? record.youtube_category_id.trim()
+        : undefined,
+    creatomate_thumbnail_template_id:
+      typeof record.creatomate_thumbnail_template_id === "string"
+        ? record.creatomate_thumbnail_template_id.trim()
+        : undefined,
+    require_thumbnail: parseOptionalBoolean(record.require_thumbnail),
   };
 }
 
@@ -69,6 +121,8 @@ function parseUpdateChannelBody(body: unknown): UpdateChannelInput {
     "elevenlabs_voice_id",
     "creatomate_template_id",
     "upload_frequency",
+    "youtube_category_id",
+    "creatomate_thumbnail_template_id",
   ] as const;
 
   for (const field of stringFields) {
@@ -80,6 +134,10 @@ function parseUpdateChannelBody(body: unknown): UpdateChannelInput {
     }
   }
 
+  if (record.creatomate_thumbnail_template_id === null) {
+    input.creatomate_thumbnail_template_id = null;
+  }
+
   if (record.monthly_budget_usd !== undefined) {
     if (typeof record.monthly_budget_usd !== "number") {
       throw new Error("Invalid field: monthly_budget_usd");
@@ -87,11 +145,52 @@ function parseUpdateChannelBody(body: unknown): UpdateChannelInput {
     input.monthly_budget_usd = record.monthly_budget_usd;
   }
 
+  if (record.target_duration_minutes !== undefined) {
+    if (typeof record.target_duration_minutes !== "number") {
+      throw new Error("Invalid field: target_duration_minutes");
+    }
+    input.target_duration_minutes = record.target_duration_minutes;
+  }
+
   if (record.status !== undefined) {
     if (record.status !== "active" && record.status !== "paused") {
       throw new Error("Invalid field: status");
     }
     input.status = record.status;
+  }
+
+  if (record.audience_level !== undefined) {
+    if (
+      typeof record.audience_level !== "string" ||
+      !isAudienceLevel(record.audience_level)
+    ) {
+      throw new Error("Invalid field: audience_level");
+    }
+    input.audience_level = record.audience_level;
+  }
+
+  if (record.title_style !== undefined) {
+    if (
+      typeof record.title_style !== "string" ||
+      !isTitleStyle(record.title_style)
+    ) {
+      throw new Error("Invalid field: title_style");
+    }
+    input.title_style = record.title_style;
+  }
+
+  if (record.auto_publish !== undefined) {
+    if (typeof record.auto_publish !== "boolean") {
+      throw new Error("Invalid field: auto_publish");
+    }
+    input.auto_publish = record.auto_publish;
+  }
+
+  if (record.require_thumbnail !== undefined) {
+    if (typeof record.require_thumbnail !== "boolean") {
+      throw new Error("Invalid field: require_thumbnail");
+    }
+    input.require_thumbnail = record.require_thumbnail;
   }
 
   return input;

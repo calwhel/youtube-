@@ -1,8 +1,9 @@
 import { createReadStream } from "node:fs";
-import { google, type youtube_v3 } from "googleapis";
+import { google, type youtubeAnalytics_v2, type youtube_v3 } from "googleapis";
 
 import type { ServiceConfig } from "../config/channel-config";
-import type { VideoPayload } from "../types/video";
+import type { VideoAnalyticsUpdate, VideoPayload } from "../types/video";
+import { buildDescriptionWithChapters } from "./quality-gate";
 import { withRetry } from "../utils/tmp";
 
 export interface YouTubeUploadResult {
@@ -40,6 +41,13 @@ export class YouTubeService {
     });
   }
 
+  private getAnalyticsClient(): youtubeAnalytics_v2.Youtubeanalytics {
+    return google.youtubeAnalytics({
+      version: "v2",
+      auth: this.oauth2Client,
+    });
+  }
+
   async uploadVideo(
     payload: VideoPayload,
     localVideoPath: string,
@@ -47,13 +55,14 @@ export class YouTubeService {
     return withRetry(
       async () => {
         const privacyStatus = this.config.youtube.privacyStatus;
+        const description = buildDescriptionWithChapters(payload);
 
         const response = await this.youtube.videos.insert({
           part: ["snippet", "status"],
           requestBody: {
             snippet: {
               title: payload.title,
-              description: payload.description,
+              description,
               tags: payload.tags,
               categoryId: this.config.youtube.categoryId,
             },
@@ -81,6 +90,26 @@ export class YouTubeService {
       {
         ...this.config.retry,
         label: "youtube-upload",
+      },
+    );
+  }
+
+  async uploadThumbnail(
+    youtubeVideoId: string,
+    thumbnailPath: string,
+  ): Promise<void> {
+    await withRetry(
+      async () => {
+        await this.youtube.thumbnails.set({
+          videoId: youtubeVideoId,
+          media: {
+            body: createReadStream(thumbnailPath),
+          },
+        });
+      },
+      {
+        ...this.config.retry,
+        label: "youtube-thumbnail-upload",
       },
     );
   }
@@ -118,16 +147,13 @@ export class YouTubeService {
     let watchHoursTotal = 0;
 
     try {
-      const analytics = google.youtubeAnalytics({
-        version: "v2",
-        auth: this.oauth2Client,
-      });
-
+      const analytics = this.getAnalyticsClient();
       const endDate = new Date();
       const startDate = new Date();
       startDate.setFullYear(startDate.getFullYear() - 1);
 
-      const formatDate = (date: Date): string => date.toISOString().slice(0, 10);
+      const formatDate = (date: Date): string =>
+        date.toISOString().slice(0, 10);
 
       const analyticsResponse = await analytics.reports.query({
         ids: "channel==MINE",
@@ -153,6 +179,60 @@ export class YouTubeService {
       subsCount,
       watchHoursTotal,
       monetizationEligible,
+    };
+  }
+
+  async fetchVideoAnalytics(
+    youtubeVideoId: string,
+  ): Promise<VideoAnalyticsUpdate> {
+    const statsResponse = await this.youtube.videos.list({
+      part: ["statistics"],
+      id: [youtubeVideoId],
+    });
+
+    const item = statsResponse.data.items?.[0];
+    const viewCount = Number(item?.statistics?.viewCount ?? 0);
+
+    let ctr = 0;
+    let impressions = 0;
+    let avgViewDurationSeconds = 0;
+
+    try {
+      const analytics = this.getAnalyticsClient();
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 28);
+
+      const formatDate = (date: Date): string =>
+        date.toISOString().slice(0, 10);
+
+      const report = await analytics.reports.query({
+        ids: "channel==MINE",
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        metrics:
+          "views,impressions,clickThroughRate,averageViewDuration",
+        filters: `video==${youtubeVideoId}`,
+      });
+
+      const row = report.data.rows?.[0];
+      if (row) {
+        impressions = Number(row[1] ?? 0);
+        ctr = Number(row[2] ?? 0);
+        avgViewDurationSeconds = Number(row[3] ?? 0);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[youtube] video analytics unavailable for ${youtubeVideoId}: ${message}`,
+      );
+    }
+
+    return {
+      view_count: viewCount,
+      ctr,
+      avg_view_duration_seconds: avgViewDurationSeconds,
+      impressions,
     };
   }
 }

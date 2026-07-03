@@ -1,4 +1,5 @@
 import type { DecryptedChannel } from "../db/repositories/channels";
+import type { ContentSettings } from "../types/channel";
 import type { PlatformConfig } from "./index";
 
 export interface ServiceConfig {
@@ -7,7 +8,10 @@ export interface ServiceConfig {
   tmpDir: string;
   anthropic: PlatformConfig["anthropic"];
   elevenlabs: PlatformConfig["elevenlabs"] & { voiceId: string };
-  creatomate: PlatformConfig["creatomate"] & { templateId: string };
+  creatomate: PlatformConfig["creatomate"] & {
+    templateId: string;
+    thumbnailTemplateId: string | null;
+  };
   publicBaseUrl: string;
   youtube: {
     clientId: string;
@@ -19,6 +23,7 @@ export interface ServiceConfig {
   retry: PlatformConfig["retry"];
   channelId: string;
   nichePrompt: string;
+  content: ContentSettings;
 }
 
 export function buildServiceConfig(
@@ -37,6 +42,9 @@ export function buildServiceConfig(
     creatomate: {
       ...platform.creatomate,
       templateId: channel.creatomate_template_id,
+      thumbnailTemplateId:
+        channel.creatomate_thumbnail_template_id ??
+        platform.creatomate.thumbnailTemplateId,
     },
     publicBaseUrl: platform.publicBaseUrl,
     youtube: {
@@ -44,10 +52,17 @@ export function buildServiceConfig(
       clientSecret: channel.youtube_client_secret,
       refreshToken: channel.youtube_refresh_token,
       privacyStatus: platform.youtube.privacyStatus,
-      categoryId: platform.youtube.categoryId,
+      categoryId: channel.youtube_category_id || platform.youtube.categoryId,
     },
     retry: platform.retry,
     channelId: channel.id,
     nichePrompt: channel.niche_prompt,
+    content: {
+      targetDurationMinutes: channel.target_duration_minutes,
+      audienceLevel: channel.audience_level,
+      titleStyle: channel.title_style,
+      autoPublish: channel.auto_publish,
+      requireThumbnail: channel.require_thumbnail,
+    },
   };
 }

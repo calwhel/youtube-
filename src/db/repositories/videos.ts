@@ -1,6 +1,8 @@
 import type {
   CostSummaryRow,
   PendingVideoView,
+  TopPerformingTopic,
+  VideoAnalyticsUpdate,
   VideoRecord,
   VideoStatus,
 } from "../../types/video";
@@ -34,6 +36,9 @@ export class VideoRepository {
       title: string;
       youtubeVideoId: string;
       costUsd: number;
+      thumbnailUploaded: boolean;
+      qualityScore: number | null;
+      qualityNotes: string | null;
     },
   ): Promise<VideoRecord | null> {
     return queryOne<VideoRecord>(
@@ -44,7 +49,10 @@ export class VideoRepository {
         title = $3,
         status = 'private',
         youtube_video_id = $4,
-        cost_usd = $5
+        cost_usd = $5,
+        thumbnail_uploaded = $6,
+        quality_score = $7,
+        quality_notes = $8
       WHERE id = $1
       RETURNING *
       `,
@@ -54,6 +62,9 @@ export class VideoRepository {
         data.title,
         data.youtubeVideoId,
         data.costUsd,
+        data.thumbnailUploaded,
+        data.qualityScore,
+        data.qualityNotes,
       ],
     );
   }
@@ -98,6 +109,9 @@ export class VideoRepository {
       created_at: Date;
       cost_usd: string;
       view_count: string;
+      ctr: string;
+      thumbnail_uploaded: boolean;
+      quality_score: string | null;
     }>(
       `
       SELECT
@@ -110,7 +124,10 @@ export class VideoRepository {
         v.youtube_video_id,
         v.created_at,
         v.cost_usd,
-        v.view_count
+        v.view_count,
+        v.ctr,
+        v.thumbnail_uploaded,
+        v.quality_score
       FROM videos v
       INNER JOIN channels c ON c.id = v.channel_id
       WHERE v.status = 'private'
@@ -129,6 +146,9 @@ export class VideoRepository {
       created_at: row.created_at.toISOString(),
       cost_usd: Number(row.cost_usd),
       view_count: Number(row.view_count),
+      ctr: Number(row.ctr),
+      thumbnail_uploaded: row.thumbnail_uploaded,
+      quality_score: row.quality_score ? Number(row.quality_score) : null,
     }));
   }
 
@@ -160,6 +180,75 @@ export class VideoRepository {
       month: row.month.toISOString().slice(0, 7),
       total_cost_usd: Number(row.total_cost_usd),
       video_count: Number(row.video_count),
+    }));
+  }
+
+  async listForAnalyticsSync(channelId: string): Promise<VideoRecord[]> {
+    return query<VideoRecord>(
+      `
+      SELECT *
+      FROM videos
+      WHERE channel_id = $1
+        AND youtube_video_id IS NOT NULL
+        AND status IN ('private', 'published')
+      ORDER BY created_at DESC
+      LIMIT 100
+      `,
+      [channelId],
+    );
+  }
+
+  async updateAnalytics(
+    videoId: string,
+    analytics: VideoAnalyticsUpdate,
+  ): Promise<void> {
+    await query(
+      `
+      UPDATE videos
+      SET
+        view_count = $2,
+        ctr = $3,
+        avg_view_duration_seconds = $4,
+        impressions = $5,
+        analytics_synced_at = NOW()
+      WHERE id = $1
+      `,
+      [
+        videoId,
+        analytics.view_count,
+        analytics.ctr,
+        analytics.avg_view_duration_seconds,
+        analytics.impressions,
+      ],
+    );
+  }
+
+  async getTopPerformingTopics(
+    channelId: string,
+    limit = 10,
+  ): Promise<TopPerformingTopic[]> {
+    const rows = await query<{
+      topic: string;
+      view_count: string;
+      ctr: string;
+    }>(
+      `
+      SELECT topic, view_count::text, ctr::text
+      FROM videos
+      WHERE channel_id = $1
+        AND topic IS NOT NULL
+        AND status IN ('private', 'published')
+        AND view_count > 0
+      ORDER BY view_count DESC, ctr DESC
+      LIMIT $2
+      `,
+      [channelId, limit],
+    );
+
+    return rows.map((row) => ({
+      topic: row.topic,
+      view_count: Number(row.view_count),
+      ctr: Number(row.ctr),
     }));
   }
 }

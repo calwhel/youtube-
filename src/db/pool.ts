@@ -73,6 +73,11 @@ export async function bootstrapSchema(): Promise<void> {
   const schemaPath = path.join(__dirname, "schema.sql");
   const schemaSql = await readFile(schemaPath, "utf8");
   await getPool().query(schemaSql);
+
+  const migrationsPath = path.join(__dirname, "migrations.sql");
+  const migrationsSql = await readFile(migrationsPath, "utf8");
+  await getPool().query(migrationsSql);
+
   console.log("[db] schema bootstrap complete");
 }
 

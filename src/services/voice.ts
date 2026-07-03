@@ -4,7 +4,12 @@ import path from "node:path";
 import { Readable } from "node:stream";
 
 import type { ServiceConfig } from "../config/channel-config";
-import type { VideoPayload } from "../types/video";
+import type { SceneAudioSegment, VideoPayload } from "../types/video";
+import {
+  concatAudioFiles,
+  estimateWordCountDurationSeconds,
+  getAudioDurationSeconds,
+} from "../utils/ffmpeg";
 import { withRetry } from "../utils/tmp";
 
 export class VoiceService {
@@ -24,10 +29,37 @@ export class VoiceService {
   async synthesizeVoiceover(
     payload: VideoPayload,
     runDir: string,
-  ): Promise<string> {
-    const masterScript = this.buildMasterScript(payload);
-    const outputPath = path.join(runDir, "voiceover.mp3");
+  ): Promise<{ voiceoverPath: string; segments: SceneAudioSegment[] }> {
+    const segments: SceneAudioSegment[] = [];
 
+    for (const [index, scene] of payload.scenes.entries()) {
+      const scenePath = path.join(runDir, `scene-${index + 1}.mp3`);
+      await this.synthesizeScene(scene.voiceover_text, scenePath);
+
+      let durationSeconds = await getAudioDurationSeconds(scenePath);
+      if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+        durationSeconds = estimateWordCountDurationSeconds(scene.voiceover_text);
+      }
+
+      payload.scenes[index].duration_seconds = durationSeconds;
+      segments.push({
+        sceneIndex: index,
+        filePath: scenePath,
+        durationSeconds,
+      });
+    }
+
+    const voiceoverPath = path.join(runDir, "voiceover.mp3");
+    await concatAudioFiles(
+      segments.map((segment) => segment.filePath),
+      voiceoverPath,
+      runDir,
+    );
+
+    return { voiceoverPath, segments };
+  }
+
+  private async synthesizeScene(text: string, outputPath: string): Promise<void> {
     await withRetry(
       async () => {
         const url = `https://api.elevenlabs.io/v1/text-to-speech/${this.config.elevenlabs.voiceId}`;
@@ -39,12 +71,12 @@ export class VoiceService {
             Accept: "audio/mpeg",
           },
           body: JSON.stringify({
-            text: masterScript,
+            text,
             model_id: this.config.elevenlabs.modelId,
             voice_settings: {
               stability: 0.45,
               similarity_boost: 0.8,
-              style: 0.2,
+              style: 0.25,
               use_speaker_boost: true,
             },
           }),
@@ -70,10 +102,8 @@ export class VoiceService {
       },
       {
         ...this.config.retry,
-        label: "elevenlabs-tts",
+        label: "elevenlabs-tts-scene",
       },
     );
-
-    return outputPath;
   }
 }

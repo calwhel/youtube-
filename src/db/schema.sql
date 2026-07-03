@@ -12,6 +12,13 @@ CREATE TABLE IF NOT EXISTS channels (
   upload_frequency TEXT NOT NULL DEFAULT '0 14 * * *',
   monthly_budget_usd NUMERIC(10, 2) NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'paused' CHECK (status IN ('active', 'paused')),
+  target_duration_minutes INTEGER NOT NULL DEFAULT 10,
+  audience_level TEXT NOT NULL DEFAULT 'general',
+  title_style TEXT NOT NULL DEFAULT 'curiosity',
+  auto_publish BOOLEAN NOT NULL DEFAULT FALSE,
+  youtube_category_id TEXT NOT NULL DEFAULT '28',
+  creatomate_thumbnail_template_id TEXT,
+  require_thumbnail BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -27,6 +34,13 @@ CREATE TABLE IF NOT EXISTS videos (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   cost_usd NUMERIC(10, 4) DEFAULT 0,
   view_count BIGINT DEFAULT 0,
+  ctr NUMERIC(8, 4) DEFAULT 0,
+  avg_view_duration_seconds NUMERIC(10, 2) DEFAULT 0,
+  impressions BIGINT DEFAULT 0,
+  analytics_synced_at TIMESTAMPTZ,
+  thumbnail_uploaded BOOLEAN DEFAULT FALSE,
+  quality_score NUMERIC(5, 2),
+  quality_notes TEXT,
   published_at TIMESTAMPTZ
 );
 

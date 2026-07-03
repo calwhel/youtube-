@@ -15,6 +15,7 @@ export interface PlatformConfig {
     apiKey: string;
     pollIntervalMs: number;
     pollTimeoutMs: number;
+    thumbnailTemplateId: string | null;
   };
   publicBaseUrl: string;
   youtube: {
@@ -109,6 +110,8 @@ export function loadConfig(): PlatformConfig {
         optionalEnv("CREATOMATE_POLL_TIMEOUT_MS", "900000"),
         900_000,
       ),
+      thumbnailTemplateId:
+        process.env.CREATOMATE_THUMBNAIL_TEMPLATE_ID?.trim() || null,
     },
     publicBaseUrl: resolvePublicBaseUrl(
       parsePositiveInt(optionalEnv("PORT", "3000"), 3000),

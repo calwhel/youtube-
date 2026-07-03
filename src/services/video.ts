@@ -41,6 +41,12 @@ export class VideoService {
       modifications[`Scene-${sceneNumber}-Overlay.text`] = scene.overlay_text;
       modifications[`Scene-${sceneNumber}-Voiceover.text`] =
         scene.voiceover_text;
+
+      if (scene.duration_seconds && scene.duration_seconds > 0) {
+        modifications[`Scene-${sceneNumber}.duration`] = scene.duration_seconds;
+        modifications[`Scene-${sceneNumber}-Duration`] =
+          scene.duration_seconds;
+      }
     });
 
     return modifications;
