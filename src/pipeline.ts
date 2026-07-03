@@ -6,6 +6,7 @@ import { VideoRepository } from "./db/repositories/videos";
 import { LlmService } from "./services/llm";
 import { NotificationService } from "./services/notifications";
 import { PublishFinalizer } from "./services/publish-finalizer";
+import { runAuthenticityGate } from "./services/authenticity-gate";
 import { runQualityGate } from "./services/quality-gate";
 import { ShortsService } from "./services/shorts";
 import { ThumbnailService } from "./services/thumbnail";
@@ -15,6 +16,7 @@ import { VoiceService } from "./services/voice";
 import { YouTubeService } from "./services/youtube";
 import type { PipelineResult } from "./types/video";
 import { estimatePipelineCostUsd } from "./utils/cost";
+import { canAutoPublish, pickCreatomateTemplate } from "./utils/template-picker";
 import { cleanupTmpDir, ensureTmpDir } from "./utils/tmp";
 
 export interface RunPipelineOptions {
@@ -61,7 +63,23 @@ export class PipelineOrchestrator {
       );
     }
 
-    const serviceConfig = buildServiceConfig(this.platform, channel);
+    if (
+      channel.max_videos_per_week > 0 &&
+      (await this.videos.countVideosThisWeek(channel.id)) >=
+        channel.max_videos_per_week
+    ) {
+      throw new Error(
+        `Weekly slow-lane limit reached for channel "${channel.name}" (${channel.max_videos_per_week} videos/week)`,
+      );
+    }
+
+    const videoIndex = await this.videos.countTotalLongForm(channel.id);
+    const selectedTemplateId = pickCreatomateTemplate(channel, videoIndex);
+    const serviceConfig = buildServiceConfig(
+      this.platform,
+      channel,
+      selectedTemplateId,
+    );
     const topicResearch = new TopicResearchService(serviceConfig);
     const llm = new LlmService(serviceConfig);
     const voice = new VoiceService(serviceConfig);
@@ -93,6 +111,8 @@ export class PipelineOrchestrator {
     let thumbnailUploaded = false;
     let qualityScore: number | null = null;
     let qualityNotes: string | null = null;
+    let authenticityScore: number | null = null;
+    let inauthenticityRisk: number | null = null;
     let shortVideoId: string | null = null;
     let shortVideoUrl: string | null = null;
     let engagementApplied = false;
@@ -176,14 +196,24 @@ export class PipelineOrchestrator {
         }
       }
 
+      const recentTitles = await this.videos.getRecentTitles(channel.id);
+      const authenticity = runAuthenticityGate(payload, recentTitles);
+      authenticityScore = authenticity.authenticityScore;
+      inauthenticityRisk = authenticity.inauthenticityRisk;
+
       const quality = runQualityGate(payload, serviceConfig.content, {
         thumbnailUploaded,
       });
       qualityScore = quality.score;
-      qualityNotes = quality.notes.length > 0 ? quality.notes.join("; ") : null;
+
+      const allNotes = [...quality.notes, ...authenticity.notes];
+      qualityNotes = allNotes.length > 0 ? allNotes.join("; ") : null;
+
+      const passesGates = quality.passed && authenticity.passed;
+      const mayAutoPublish = canAutoPublish(channel) && passesGates;
 
       console.log(
-        `[pipeline] quality gate score=${quality.score} passed=${quality.passed}`,
+        `[pipeline] quality=${quality.score} authenticity=${authenticity.authenticityScore} risk=${authenticity.inauthenticityRisk} passed=${passesGates} auto=${mayAutoPublish} template=${selectedTemplateId}`,
       );
 
       const costUsd = estimatePipelineCostUsd();
@@ -203,11 +233,16 @@ export class PipelineOrchestrator {
           : null,
         shortYoutubeVideoId: shortVideoId,
         pinnedCommentText: payload.pinned_comment,
+        uniqueThesis: payload.unique_thesis,
+        authenticityScore,
+        inauthenticityRiskScore: inauthenticityRisk,
+        creatomateTemplateUsed: selectedTemplateId,
+        sourcesCited: payload.sources_cited,
       });
       await this.topicsUsed.recordTopic(channel.id, payload.topic);
 
-      if (serviceConfig.content.autoPublish && quality.passed) {
-        console.log("[pipeline] auto-publishing (quality gate passed)...");
+      if (mayAutoPublish) {
+        console.log("[pipeline] auto-publishing (quality + authenticity gates passed)...");
         await this.publishFinalizer.finalize({
           dbVideoId: videoRecord.id,
           channelId: channel.id,
@@ -218,6 +253,11 @@ export class PipelineOrchestrator {
         engagementApplied = true;
         console.log("[pipeline] video published to public");
       } else {
+        const blockReason = !passesGates
+          ? "Quality or authenticity gate failed"
+          : !canAutoPublish(channel)
+            ? `Review mode: ${channel.manual_publish_count}/${channel.min_manual_publishes_before_auto} manual publishes completed`
+            : "Auto-publish disabled";
         await this.notifications.notify({
           event: "pending_review",
           channelName: channel.name,
@@ -226,6 +266,7 @@ export class PipelineOrchestrator {
           videoUrl: upload.videoUrl,
           qualityScore,
           qualityNotes,
+          details: blockReason,
         });
       }
 
@@ -241,6 +282,8 @@ export class PipelineOrchestrator {
         autoPublished,
         qualityScore,
         qualityNotes,
+        authenticityScore,
+        inauthenticityRisk,
         shortVideoId,
         shortVideoUrl,
         thumbnailVariant: "A",

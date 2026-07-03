@@ -15,6 +15,10 @@ Each run follows a **research → script → voice → video → thumbnail → S
 7. **Quality gate** — Scores packaging; optional auto-publish when score ≥ 70
 8. **Analytics + A/B** — Daily sync; auto-swap to thumbnail B if CTR underperforms after 24h
 9. **Webhooks** — Slack/Discord alerts for pending review, publish, failures, monetization
+10. **Authenticity layer** — Original thesis, contrarian angle, sources, inauthenticity risk scoring
+11. **YPP readiness** — `GET /api/monetization/readiness` checklist before applying
+12. **Synthetic disclosure** — `containsSyntheticMedia` set on YouTube upload when enabled
+13. **Slow-lane + review mode** — Weekly caps and mandatory manual publishes pre-monetization
 
 ## Architecture
 

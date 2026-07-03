@@ -7,10 +7,18 @@ import type {
   ChannelRecord,
   ChannelStatsRecord,
   CreateChannelInput,
+  ReviewMode,
   TitleStyle,
   UpdateChannelInput,
 } from "../../types/channel";
 import { query, queryOne } from "../pool";
+
+function normalizeTemplateIds(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((id): id is string => typeof id === "string" && id.trim() !== "");
+  }
+  return [];
+}
 
 function mapChannelPublic(
   channel: ChannelRecord,
@@ -37,6 +45,12 @@ function mapChannelPublic(
     enable_ab_thumbnails: channel.enable_ab_thumbnails,
     enable_engagement: channel.enable_engagement,
     default_playlist_id: channel.default_playlist_id,
+    creatomate_template_ids: normalizeTemplateIds(channel.creatomate_template_ids),
+    review_mode: channel.review_mode,
+    manual_publish_count: channel.manual_publish_count,
+    min_manual_publishes_before_auto: channel.min_manual_publishes_before_auto,
+    max_videos_per_week: channel.max_videos_per_week,
+    disclose_synthetic_media: channel.disclose_synthetic_media,
     created_at: channel.created_at.toISOString(),
     stats: stats
       ? {
@@ -147,9 +161,14 @@ export class ChannelRepository {
         auto_generate_shorts,
         enable_ab_thumbnails,
         enable_engagement,
-        default_playlist_id
+        default_playlist_id,
+        creatomate_template_ids,
+        review_mode,
+        min_manual_publishes_before_auto,
+        max_videos_per_week,
+        disclose_synthetic_media
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING *
       `,
       [
@@ -174,6 +193,11 @@ export class ChannelRepository {
         input.enable_ab_thumbnails ?? true,
         input.enable_engagement ?? true,
         input.default_playlist_id ?? null,
+        JSON.stringify(input.creatomate_template_ids ?? []),
+        input.review_mode ?? "required",
+        input.min_manual_publishes_before_auto ?? 5,
+        input.max_videos_per_week ?? 3,
+        input.disclose_synthetic_media ?? true,
       ],
     );
 
@@ -226,7 +250,12 @@ export class ChannelRepository {
         auto_generate_shorts = COALESCE($19, auto_generate_shorts),
         enable_ab_thumbnails = COALESCE($20, enable_ab_thumbnails),
         enable_engagement = COALESCE($21, enable_engagement),
-        default_playlist_id = COALESCE($22, default_playlist_id)
+        default_playlist_id = COALESCE($22, default_playlist_id),
+        creatomate_template_ids = COALESCE($23, creatomate_template_ids),
+        review_mode = COALESCE($24, review_mode),
+        min_manual_publishes_before_auto = COALESCE($25, min_manual_publishes_before_auto),
+        max_videos_per_week = COALESCE($26, max_videos_per_week),
+        disclose_synthetic_media = COALESCE($27, disclose_synthetic_media)
       WHERE id = $1
       RETURNING *
       `,
@@ -257,6 +286,13 @@ export class ChannelRepository {
         input.enable_ab_thumbnails ?? null,
         input.enable_engagement ?? null,
         input.default_playlist_id ?? null,
+        input.creatomate_template_ids
+          ? JSON.stringify(input.creatomate_template_ids)
+          : null,
+        input.review_mode ?? null,
+        input.min_manual_publishes_before_auto ?? null,
+        input.max_videos_per_week ?? null,
+        input.disclose_synthetic_media ?? null,
       ],
     );
 
@@ -265,6 +301,17 @@ export class ChannelRepository {
     }
 
     return mapChannelPublic(row, await this.getStats(id));
+  }
+
+  async incrementManualPublishCount(channelId: string): Promise<void> {
+    await query(
+      `
+      UPDATE channels
+      SET manual_publish_count = manual_publish_count + 1
+      WHERE id = $1
+      `,
+      [channelId],
+    );
   }
 
   async markMonetizationAlertSent(channelId: string): Promise<void> {
@@ -351,6 +398,10 @@ export class ChannelRepository {
 
 export function isAudienceLevel(value: string): value is AudienceLevel {
   return ["beginner", "intermediate", "advanced", "general"].includes(value);
+}
+
+export function isReviewMode(value: string): value is ReviewMode {
+  return value === "required" || value === "optional";
 }
 
 export function isTitleStyle(value: string): value is TitleStyle {

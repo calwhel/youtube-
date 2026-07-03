@@ -43,6 +43,11 @@ export class VideoRepository {
       thumbnailBPrompt: string | null;
       shortYoutubeVideoId: string | null;
       pinnedCommentText: string | null;
+      uniqueThesis: string | null;
+      authenticityScore: number | null;
+      inauthenticityRiskScore: number | null;
+      creatomateTemplateUsed: string | null;
+      sourcesCited: string[] | null;
     },
   ): Promise<VideoRecord | null> {
     return queryOne<VideoRecord>(
@@ -60,7 +65,12 @@ export class VideoRepository {
         thumbnail_b_text = $9,
         thumbnail_b_prompt = $10,
         short_youtube_video_id = $11,
-        pinned_comment_text = $12
+        pinned_comment_text = $12,
+        unique_thesis = $13,
+        authenticity_score = $14,
+        inauthenticity_risk_score = $15,
+        creatomate_template_used = $16,
+        sources_cited = $17
       WHERE id = $1
       RETURNING *
       `,
@@ -77,6 +87,11 @@ export class VideoRepository {
         data.thumbnailBPrompt,
         data.shortYoutubeVideoId,
         data.pinnedCommentText,
+        data.uniqueThesis,
+        data.authenticityScore,
+        data.inauthenticityRiskScore,
+        data.creatomateTemplateUsed,
+        data.sourcesCited ? JSON.stringify(data.sourcesCited) : null,
       ],
     );
   }
@@ -350,5 +365,128 @@ export class VideoRepository {
       view_count: Number(row.view_count),
       ctr: Number(row.ctr),
     }));
+  }
+
+  async countPublishedLongForm(channelId: string): Promise<number> {
+    const row = await queryOne<{ count: string }>(
+      `
+      SELECT COUNT(*)::text AS count
+      FROM videos
+      WHERE channel_id = $1
+        AND status = 'published'
+        AND video_type = 'long'
+      `,
+      [channelId],
+    );
+    return Number(row?.count ?? 0);
+  }
+
+  async countTotalLongForm(channelId: string): Promise<number> {
+    const row = await queryOne<{ count: string }>(
+      `
+      SELECT COUNT(*)::text AS count
+      FROM videos
+      WHERE channel_id = $1
+        AND video_type = 'long'
+        AND status IN ('private', 'published')
+      `,
+      [channelId],
+    );
+    return Number(row?.count ?? 0);
+  }
+
+  async countVideosThisWeek(channelId: string): Promise<number> {
+    const row = await queryOne<{ count: string }>(
+      `
+      SELECT COUNT(*)::text AS count
+      FROM videos
+      WHERE channel_id = $1
+        AND video_type = 'long'
+        AND created_at >= date_trunc('week', NOW())
+        AND status IN ('processing', 'private', 'published')
+      `,
+      [channelId],
+    );
+    return Number(row?.count ?? 0);
+  }
+
+  async getRecentTitles(channelId: string, limit = 5): Promise<string[]> {
+    const rows = await query<{ title: string | null }>(
+      `
+      SELECT title
+      FROM videos
+      WHERE channel_id = $1
+        AND video_type = 'long'
+        AND title IS NOT NULL
+        AND status IN ('private', 'published')
+      ORDER BY created_at DESC
+      LIMIT $2
+      `,
+      [channelId, limit],
+    );
+    return rows
+      .map((row) => row.title)
+      .filter((title): title is string => Boolean(title));
+  }
+
+  async getAverageAuthenticityScore(channelId: string): Promise<number> {
+    const row = await queryOne<{ avg: string }>(
+      `
+      SELECT COALESCE(AVG(authenticity_score), 0)::text AS avg
+      FROM videos
+      WHERE channel_id = $1
+        AND authenticity_score IS NOT NULL
+        AND status IN ('private', 'published')
+      `,
+      [channelId],
+    );
+    return Number(row?.avg ?? 0);
+  }
+
+  async getAverageInauthenticityRisk(channelId: string): Promise<number> {
+    const row = await queryOne<{ avg: string }>(
+      `
+      SELECT COALESCE(AVG(inauthenticity_risk_score), 0)::text AS avg
+      FROM videos
+      WHERE channel_id = $1
+        AND inauthenticity_risk_score IS NOT NULL
+        AND status IN ('private', 'published')
+      `,
+      [channelId],
+    );
+    return Number(row?.avg ?? 0);
+  }
+
+  async getVariationScore(channelId: string): Promise<number> {
+    const rows = await query<{ title: string | null; topic: string | null }>(
+      `
+      SELECT title, topic
+      FROM videos
+      WHERE channel_id = $1
+        AND video_type = 'long'
+        AND status IN ('private', 'published')
+      ORDER BY created_at DESC
+      LIMIT 20
+      `,
+      [channelId],
+    );
+
+    if (rows.length < 2) {
+      return rows.length === 1 ? 50 : 0;
+    }
+
+    const titles = rows
+      .map((row) => row.title?.toLowerCase().trim())
+      .filter(Boolean) as string[];
+    const topics = rows
+      .map((row) => row.topic?.toLowerCase().trim())
+      .filter(Boolean) as string[];
+
+    const uniqueTitles = new Set(titles).size;
+    const uniqueTopics = new Set(topics).size;
+    const titleRatio = uniqueTitles / titles.length;
+    const topicRatio = uniqueTopics / topics.length;
+
+    return Math.round(((titleRatio + topicRatio) / 2) * 100);
   }
 }

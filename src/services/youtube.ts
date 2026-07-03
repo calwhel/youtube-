@@ -69,6 +69,10 @@ export class YouTubeService {
             status: {
               privacyStatus,
               selfDeclaredMadeForKids: false,
+              containsSyntheticMedia:
+                this.config.youtube.discloseSyntheticMedia,
+            } as youtube_v3.Schema$VideoStatus & {
+              containsSyntheticMedia?: boolean;
             },
           },
           media: {
@@ -116,6 +120,10 @@ export class YouTubeService {
             status: {
               privacyStatus,
               selfDeclaredMadeForKids: false,
+              containsSyntheticMedia:
+                this.config.youtube.discloseSyntheticMedia,
+            } as youtube_v3.Schema$VideoStatus & {
+              containsSyntheticMedia?: boolean;
             },
           },
           media: {

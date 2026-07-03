@@ -46,6 +46,11 @@ interface VideoPayload {
   thumbnail_b_text: string;
   short_title: string;
   pinned_comment: string;
+  unique_thesis: string;
+  contrarian_angle: string;
+  creator_perspective: string;
+  specific_examples: string[];
+  sources_cited: string[];
   chapters: Array<{ timestamp: string; title: string }>;
   scenes: Array<{
     voiceover_text: string;
@@ -65,6 +70,17 @@ Retention and packaging rules:
 - thumbnail_b_text: alternate thumbnail overlay text — different hook angle from thumbnail_text (max 4 words)
 - short_title: punchy Shorts title under 70 chars ending with #Shorts — optimized for the hook clip
 - pinned_comment: engaging question to pin on the video (1-2 sentences, drives comments)
+
+Authenticity rules (CRITICAL for YouTube monetization — avoid inauthentic/mass-produced content flags):
+- unique_thesis: one sentence stating the video's original argument — what conventional wisdom gets wrong, or your channel's fresh take
+- contrarian_angle: 1-2 sentences explaining what most videos on this topic miss, and why your angle is different
+- creator_perspective: 2-3 sentences in the channel's editorial voice — use "we" or "this channel" and show human judgment, not generic narration
+- specific_examples: array of 3-6 concrete examples with names, dates, numbers, or real-world cases (not vague generalities)
+- sources_cited: array of 2-5 plausible reference sources (studies, institutions, missions, books, official reports — format as readable citations)
+- Weave specific_examples naturally into scene voiceovers — do NOT just list facts; explain why each example matters
+- Avoid generic filler: "in this video", "did you know", "without further ado", "smash that subscribe button"
+- Each video must feel materially different in substance, not just wording
+
 - chapters: 4-8 entries with MM:SS timestamps starting at 00:00; align to scene boundaries
 - scenes: 6-10 scenes
 
@@ -122,11 +138,28 @@ function assertVideoPayload(value: unknown): VideoPayload {
     "thumbnail_b_text",
     "short_title",
     "pinned_comment",
+    "unique_thesis",
+    "contrarian_angle",
+    "creator_perspective",
   ] as const;
 
   for (const key of requiredStrings) {
     if (typeof payload[key] !== "string" || payload[key].trim() === "") {
       throw new Error(`LLM payload missing or invalid field: ${key}`);
+    }
+  }
+
+  for (const arrayField of ["specific_examples", "sources_cited"] as const) {
+    if (
+      !Array.isArray(payload[arrayField]) ||
+      payload[arrayField].length === 0
+    ) {
+      throw new Error(`LLM payload missing or invalid field: ${arrayField}`);
+    }
+    for (const [index, item] of payload[arrayField].entries()) {
+      if (typeof item !== "string" || item.trim() === "") {
+        throw new Error(`${arrayField}[${index}] must be a non-empty string`);
+      }
     }
   }
 

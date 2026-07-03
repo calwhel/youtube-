@@ -1,5 +1,6 @@
 import type { VideoPayload, QualityGateResult } from "../types/video";
 import type { ContentSettings } from "../types/channel";
+import { appendSourcesToDescription } from "./authenticity-gate";
 
 const HOOK_PATTERNS = [
   /\b(why|how|what if|never|secret|hidden|truth|shocking|nobody)\b/i,
@@ -21,15 +22,16 @@ export function estimateScriptWordCount(payload: VideoPayload): number {
 export function buildDescriptionWithChapters(
   payload: VideoPayload,
 ): string {
-  if (!payload.chapters || payload.chapters.length === 0) {
-    return payload.description;
+  let description = payload.description;
+
+  if (payload.chapters && payload.chapters.length > 0) {
+    const chapterBlock = payload.chapters
+      .map((chapter) => `${chapter.timestamp} ${chapter.title}`)
+      .join("\n");
+    description = `${description.trim()}\n\nChapters:\n${chapterBlock}`;
   }
 
-  const chapterBlock = payload.chapters
-    .map((chapter) => `${chapter.timestamp} ${chapter.title}`)
-    .join("\n");
-
-  return `${payload.description.trim()}\n\nChapters:\n${chapterBlock}`;
+  return appendSourcesToDescription(description, payload.sources_cited ?? []);
 }
 
 export function runQualityGate(

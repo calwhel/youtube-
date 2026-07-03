@@ -42,3 +42,17 @@ CREATE INDEX IF NOT EXISTS idx_videos_parent_video_id ON videos(parent_video_id)
 CREATE INDEX IF NOT EXISTS idx_videos_video_type ON videos(video_type);
 CREATE INDEX IF NOT EXISTS idx_videos_thumbnail_ab ON videos(thumbnail_variant, published_at)
   WHERE video_type = 'long' AND status = 'published';
+
+-- Week 3 authenticity layer
+ALTER TABLE channels ADD COLUMN IF NOT EXISTS creatomate_template_ids JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE channels ADD COLUMN IF NOT EXISTS review_mode TEXT NOT NULL DEFAULT 'required';
+ALTER TABLE channels ADD COLUMN IF NOT EXISTS manual_publish_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE channels ADD COLUMN IF NOT EXISTS min_manual_publishes_before_auto INTEGER NOT NULL DEFAULT 5;
+ALTER TABLE channels ADD COLUMN IF NOT EXISTS max_videos_per_week INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE channels ADD COLUMN IF NOT EXISTS disclose_synthetic_media BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS unique_thesis TEXT;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS authenticity_score NUMERIC(5, 2);
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS inauthenticity_risk_score NUMERIC(5, 2);
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS creatomate_template_used TEXT;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS sources_cited JSONB;

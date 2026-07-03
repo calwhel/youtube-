@@ -21,6 +21,11 @@ export interface VideoPayload {
   thumbnail_b_text: string;
   short_title: string;
   pinned_comment: string;
+  unique_thesis: string;
+  contrarian_angle: string;
+  creator_perspective: string;
+  specific_examples: string[];
+  sources_cited: string[];
   scenes: VideoScene[];
   chapters?: VideoChapter[];
 }
@@ -58,6 +63,11 @@ export interface VideoRecord {
   engagement_applied: boolean;
   pinned_comment_id: string | null;
   pinned_comment_text: string | null;
+  unique_thesis: string | null;
+  authenticity_score: string | null;
+  inauthenticity_risk_score: string | null;
+  creatomate_template_used: string | null;
+  sources_cited: string[] | null;
   published_at: Date | null;
 }
 
@@ -90,6 +100,8 @@ export interface PipelineResult {
   autoPublished: boolean;
   qualityScore: number | null;
   qualityNotes: string | null;
+  authenticityScore: number | null;
+  inauthenticityRisk: number | null;
   shortVideoId: string | null;
   shortVideoUrl: string | null;
   thumbnailVariant: ThumbnailVariant;
@@ -120,6 +132,13 @@ export interface TopPerformingTopic {
 export interface QualityGateResult {
   passed: boolean;
   score: number;
+  notes: string[];
+}
+
+export interface AuthenticityGateResult {
+  passed: boolean;
+  authenticityScore: number;
+  inauthenticityRisk: number;
   notes: string[];
 }
 

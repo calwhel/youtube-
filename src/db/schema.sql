@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS channels (
   enable_ab_thumbnails BOOLEAN NOT NULL DEFAULT TRUE,
   enable_engagement BOOLEAN NOT NULL DEFAULT TRUE,
   default_playlist_id TEXT,
+  creatomate_template_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  review_mode TEXT NOT NULL DEFAULT 'required' CHECK (review_mode IN ('required', 'optional')),
+  manual_publish_count INTEGER NOT NULL DEFAULT 0,
+  min_manual_publishes_before_auto INTEGER NOT NULL DEFAULT 5,
+  max_videos_per_week INTEGER NOT NULL DEFAULT 3,
+  disclose_synthetic_media BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -57,7 +63,11 @@ CREATE TABLE IF NOT EXISTS videos (
   pinned_comment_text TEXT,
   engagement_applied BOOLEAN NOT NULL DEFAULT FALSE,
   pinned_comment_id TEXT,
-  pinned_comment_text TEXT,
+  unique_thesis TEXT,
+  authenticity_score NUMERIC(5, 2),
+  inauthenticity_risk_score NUMERIC(5, 2),
+  creatomate_template_used TEXT,
+  sources_cited JSONB,
   published_at TIMESTAMPTZ
 );
 

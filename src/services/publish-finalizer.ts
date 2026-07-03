@@ -11,6 +11,7 @@ export interface FinalizePublishInput {
   channelId: string;
   youtubeVideoId: string;
   shortYoutubeVideoId?: string | null;
+  isManualPublish?: boolean;
 }
 
 export class PublishFinalizer {
@@ -50,6 +51,10 @@ export class PublishFinalizer {
 
     await this.videos.markPublished(input.dbVideoId);
 
+    if (input.isManualPublish) {
+      await this.channels.incrementManualPublishCount(input.channelId);
+    }
+
     if (!video.engagement_applied && video.title && video.topic) {
       const previousPublished = await this.videos.getLatestPublishedVideo(
         input.channelId,
@@ -71,6 +76,11 @@ export class PublishFinalizer {
           pinned_comment:
             video.pinned_comment_text ??
             `What surprised you most about ${video.topic}? Drop a comment below.`,
+          unique_thesis: video.unique_thesis ?? "",
+          contrarian_angle: "",
+          creator_perspective: "",
+          specific_examples: [],
+          sources_cited: [],
           scenes: [],
         },
         youtubeVideoId: input.youtubeVideoId,

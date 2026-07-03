@@ -4,6 +4,7 @@ import type { PlatformConfig } from "../config";
 import {
   ChannelRepository,
   isAudienceLevel,
+  isReviewMode,
   isTitleStyle,
 } from "../db/repositories/channels";
 import type {
@@ -23,6 +24,16 @@ function parseOptionalNumber(value: unknown): number | undefined {
     return value;
   }
   return undefined;
+}
+
+function parseTemplateIdsArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const ids = value.filter(
+    (item): item is string => typeof item === "string" && item.trim() !== "",
+  );
+  return ids.length > 0 ? ids : [];
 }
 
 function parseCreateChannelBody(body: unknown): CreateChannelInput {
@@ -108,6 +119,16 @@ function parseCreateChannelBody(body: unknown): CreateChannelInput {
       typeof record.default_playlist_id === "string"
         ? record.default_playlist_id.trim()
         : undefined,
+    creatomate_template_ids: parseTemplateIdsArray(record.creatomate_template_ids),
+    review_mode:
+      typeof record.review_mode === "string" && isReviewMode(record.review_mode)
+        ? record.review_mode
+        : undefined,
+    min_manual_publishes_before_auto: parseOptionalNumber(
+      record.min_manual_publishes_before_auto,
+    ),
+    max_videos_per_week: parseOptionalNumber(record.max_videos_per_week),
+    disclose_synthetic_media: parseOptionalBoolean(record.disclose_synthetic_media),
   };
 }
 
@@ -225,6 +246,45 @@ function parseUpdateChannelBody(body: unknown): UpdateChannelInput {
       record.default_playlist_id === null
         ? null
         : record.default_playlist_id.trim();
+  }
+
+  if (record.creatomate_template_ids !== undefined) {
+    const ids = parseTemplateIdsArray(record.creatomate_template_ids);
+    if (ids === undefined) {
+      throw new Error("Invalid field: creatomate_template_ids");
+    }
+    input.creatomate_template_ids = ids;
+  }
+
+  if (record.review_mode !== undefined) {
+    if (
+      typeof record.review_mode !== "string" ||
+      !isReviewMode(record.review_mode)
+    ) {
+      throw new Error("Invalid field: review_mode");
+    }
+    input.review_mode = record.review_mode;
+  }
+
+  if (record.min_manual_publishes_before_auto !== undefined) {
+    if (typeof record.min_manual_publishes_before_auto !== "number") {
+      throw new Error("Invalid field: min_manual_publishes_before_auto");
+    }
+    input.min_manual_publishes_before_auto = record.min_manual_publishes_before_auto;
+  }
+
+  if (record.max_videos_per_week !== undefined) {
+    if (typeof record.max_videos_per_week !== "number") {
+      throw new Error("Invalid field: max_videos_per_week");
+    }
+    input.max_videos_per_week = record.max_videos_per_week;
+  }
+
+  if (record.disclose_synthetic_media !== undefined) {
+    if (typeof record.disclose_synthetic_media !== "boolean") {
+      throw new Error("Invalid field: disclose_synthetic_media");
+    }
+    input.disclose_synthetic_media = record.disclose_synthetic_media;
   }
 
   return input;

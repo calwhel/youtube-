@@ -7,6 +7,7 @@ import type { PipelineOrchestrator } from "../pipeline";
 import { AnalyticsSyncService } from "../services/analytics-sync";
 import { PublishFinalizer } from "../services/publish-finalizer";
 import { ThumbnailAbService } from "../services/thumbnail-ab";
+import { YppReadinessService } from "../services/ypp-readiness";
 
 const runningChannels = new Set<string>();
 
@@ -100,6 +101,7 @@ export function createPipelineRoutes(
         channelId: video.channel_id,
         youtubeVideoId: video.youtube_video_id,
         shortYoutubeVideoId: video.short_youtube_video_id,
+        isManualPublish: true,
       });
       const updated = await videos.findById(video.id);
 
@@ -156,6 +158,32 @@ export function createPipelineRoutes(
       const ab = new ThumbnailAbService(platform);
       const result = await ab.evaluateAndSwapAll();
       res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  router.get("/monetization/readiness", async (_req, res) => {
+    try {
+      const readiness = new YppReadinessService(platform);
+      const channels = await readiness.evaluateAll();
+      res.status(200).json({ channels });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  router.get("/monetization/readiness/:channel_id", async (req, res) => {
+    try {
+      const readiness = new YppReadinessService(platform);
+      const report = await readiness.evaluateChannel(req.params.channel_id);
+      if (!report) {
+        res.status(404).json({ error: "Channel not found" });
+        return;
+      }
+      res.status(200).json({ report });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       res.status(500).json({ success: false, error: message });
