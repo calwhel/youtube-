@@ -15,8 +15,8 @@ export class VideoRepository {
   ): Promise<VideoRecord> {
     const row = await queryOne<VideoRecord>(
       `
-      INSERT INTO videos (channel_id, topic, status)
-      VALUES ($1, $2, 'processing')
+      INSERT INTO videos (channel_id, topic, status, video_type)
+      VALUES ($1, $2, 'processing', 'long')
       RETURNING *
       `,
       [channelId, topic],
@@ -39,6 +39,10 @@ export class VideoRepository {
       thumbnailUploaded: boolean;
       qualityScore: number | null;
       qualityNotes: string | null;
+      thumbnailBText: string | null;
+      thumbnailBPrompt: string | null;
+      shortYoutubeVideoId: string | null;
+      pinnedCommentText: string | null;
     },
   ): Promise<VideoRecord | null> {
     return queryOne<VideoRecord>(
@@ -52,7 +56,11 @@ export class VideoRepository {
         cost_usd = $5,
         thumbnail_uploaded = $6,
         quality_score = $7,
-        quality_notes = $8
+        quality_notes = $8,
+        thumbnail_b_text = $9,
+        thumbnail_b_prompt = $10,
+        short_youtube_video_id = $11,
+        pinned_comment_text = $12
       WHERE id = $1
       RETURNING *
       `,
@@ -65,6 +73,10 @@ export class VideoRepository {
         data.thumbnailUploaded,
         data.qualityScore,
         data.qualityNotes,
+        data.thumbnailBText,
+        data.thumbnailBPrompt,
+        data.shortYoutubeVideoId,
+        data.pinnedCommentText,
       ],
     );
   }
@@ -90,10 +102,59 @@ export class VideoRepository {
     );
   }
 
+  async markEngagementApplied(
+    videoId: string,
+    pinnedCommentId: string | null,
+  ): Promise<void> {
+    await query(
+      `
+      UPDATE videos
+      SET
+        engagement_applied = TRUE,
+        pinned_comment_id = COALESCE($2, pinned_comment_id)
+      WHERE id = $1
+      `,
+      [videoId, pinnedCommentId],
+    );
+  }
+
+  async markThumbnailSwapped(videoId: string): Promise<void> {
+    await query(
+      `
+      UPDATE videos
+      SET
+        thumbnail_variant = 'B',
+        thumbnail_swapped_at = NOW()
+      WHERE id = $1
+      `,
+      [videoId],
+    );
+  }
+
   async findById(videoId: string): Promise<VideoRecord | null> {
     return queryOne<VideoRecord>(
       `SELECT * FROM videos WHERE id = $1`,
       [videoId],
+    );
+  }
+
+  async getLatestPublishedVideo(
+    channelId: string,
+    excludeVideoId: string,
+  ): Promise<VideoRecord | null> {
+    return queryOne<VideoRecord>(
+      `
+      SELECT *
+      FROM videos
+      WHERE channel_id = $1
+        AND id <> $2
+        AND status = 'published'
+        AND video_type = 'long'
+        AND youtube_video_id IS NOT NULL
+      ORDER BY published_at DESC NULLS LAST
+      LIMIT 1
+      `,
+      [channelId, excludeVideoId],
     );
   }
 
@@ -112,6 +173,7 @@ export class VideoRepository {
       ctr: string;
       thumbnail_uploaded: boolean;
       quality_score: string | null;
+      short_youtube_video_id: string | null;
     }>(
       `
       SELECT
@@ -127,10 +189,12 @@ export class VideoRepository {
         v.view_count,
         v.ctr,
         v.thumbnail_uploaded,
-        v.quality_score
+        v.quality_score,
+        v.short_youtube_video_id
       FROM videos v
       INNER JOIN channels c ON c.id = v.channel_id
       WHERE v.status = 'private'
+        AND v.video_type = 'long'
       ORDER BY v.created_at DESC
       `,
     );
@@ -149,6 +213,7 @@ export class VideoRepository {
       ctr: Number(row.ctr),
       thumbnail_uploaded: row.thumbnail_uploaded,
       quality_score: row.quality_score ? Number(row.quality_score) : null,
+      short_youtube_video_id: row.short_youtube_video_id,
     }));
   }
 
@@ -196,6 +261,41 @@ export class VideoRepository {
       `,
       [channelId],
     );
+  }
+
+  async listAbSwapCandidates(): Promise<VideoRecord[]> {
+    return query<VideoRecord>(
+      `
+      SELECT *
+      FROM videos
+      WHERE video_type = 'long'
+        AND status = 'published'
+        AND thumbnail_variant = 'A'
+        AND thumbnail_swapped_at IS NULL
+        AND thumbnail_b_text IS NOT NULL
+        AND thumbnail_b_prompt IS NOT NULL
+        AND published_at IS NOT NULL
+        AND published_at <= NOW() - INTERVAL '24 hours'
+        AND published_at >= NOW() - INTERVAL '14 days'
+      ORDER BY published_at ASC
+      LIMIT 50
+      `,
+    );
+  }
+
+  async getChannelAverageCtr(channelId: string): Promise<number> {
+    const row = await queryOne<{ avg_ctr: string }>(
+      `
+      SELECT COALESCE(AVG(ctr), 0)::text AS avg_ctr
+      FROM videos
+      WHERE channel_id = $1
+        AND status = 'published'
+        AND impressions >= 100
+      `,
+      [channelId],
+    );
+
+    return Number(row?.avg_ctr ?? 0);
   }
 
   async updateAnalytics(

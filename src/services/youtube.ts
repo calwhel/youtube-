@@ -94,6 +94,152 @@ export class YouTubeService {
     );
   }
 
+  async uploadShortVideo(input: {
+    title: string;
+    description: string;
+    tags: string[];
+    localVideoPath: string;
+  }): Promise<YouTubeUploadResult> {
+    return withRetry(
+      async () => {
+        const privacyStatus = this.config.youtube.privacyStatus;
+
+        const response = await this.youtube.videos.insert({
+          part: ["snippet", "status"],
+          requestBody: {
+            snippet: {
+              title: input.title.slice(0, 100),
+              description: input.description,
+              tags: input.tags,
+              categoryId: this.config.youtube.categoryId,
+            },
+            status: {
+              privacyStatus,
+              selfDeclaredMadeForKids: false,
+            },
+          },
+          media: {
+            body: createReadStream(input.localVideoPath),
+          },
+        });
+
+        const videoId = response.data.id;
+        if (!videoId) {
+          throw new Error("YouTube Shorts upload succeeded but no video ID returned");
+        }
+
+        return {
+          videoId,
+          videoUrl: `https://www.youtube.com/shorts/${videoId}`,
+          privacyStatus,
+        };
+      },
+      {
+        ...this.config.retry,
+        label: "youtube-shorts-upload",
+      },
+    );
+  }
+
+  async addVideoToPlaylist(
+    playlistId: string,
+    youtubeVideoId: string,
+  ): Promise<void> {
+    await withRetry(
+      async () => {
+        await this.youtube.playlistItems.insert({
+          part: ["snippet"],
+          requestBody: {
+            snippet: {
+              playlistId,
+              resourceId: {
+                kind: "youtube#video",
+                videoId: youtubeVideoId,
+              },
+            },
+          },
+        });
+      },
+      {
+        ...this.config.retry,
+        label: "youtube-playlist-insert",
+      },
+    );
+  }
+
+  async appendWatchNextToDescription(
+    youtubeVideoId: string,
+    relatedVideoUrl: string,
+  ): Promise<void> {
+    await withRetry(
+      async () => {
+        const current = await this.youtube.videos.list({
+          part: ["snippet"],
+          id: [youtubeVideoId],
+        });
+
+        const snippet = current.data.items?.[0]?.snippet;
+        if (!snippet) {
+          throw new Error("Video snippet not found for description update");
+        }
+
+        const watchNextBlock = `\n\n▶ Watch Next: ${relatedVideoUrl}`;
+        const description = snippet.description?.includes(relatedVideoUrl)
+          ? snippet.description
+          : `${snippet.description ?? ""}${watchNextBlock}`.trim();
+
+        await this.youtube.videos.update({
+          part: ["snippet"],
+          requestBody: {
+            id: youtubeVideoId,
+            snippet: {
+              ...snippet,
+              description,
+            },
+          },
+        });
+      },
+      {
+        ...this.config.retry,
+        label: "youtube-description-update",
+      },
+    );
+  }
+
+  async postPinnedComment(
+    youtubeVideoId: string,
+    commentText: string,
+  ): Promise<string> {
+    return withRetry(
+      async () => {
+        const thread = await this.youtube.commentThreads.insert({
+          part: ["snippet"],
+          requestBody: {
+            snippet: {
+              videoId: youtubeVideoId,
+              topLevelComment: {
+                snippet: {
+                  textOriginal: commentText,
+                },
+              },
+            },
+          },
+        });
+
+        const commentId = thread.data.id;
+        if (!commentId) {
+          throw new Error("Comment thread created but no ID returned");
+        }
+
+        return commentId;
+      },
+      {
+        ...this.config.retry,
+        label: "youtube-pinned-comment",
+      },
+    );
+  }
+
   async uploadThumbnail(
     youtubeVideoId: string,
     thumbnailPath: string,

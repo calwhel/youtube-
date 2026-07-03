@@ -17,11 +17,17 @@ export interface VideoPayload {
   tags: string[];
   thumbnail_prompt: string;
   thumbnail_text: string;
+  thumbnail_b_prompt: string;
+  thumbnail_b_text: string;
+  short_title: string;
+  pinned_comment: string;
   scenes: VideoScene[];
   chapters?: VideoChapter[];
 }
 
 export type VideoStatus = "processing" | "private" | "published" | "failed";
+export type VideoType = "long" | "short";
+export type ThumbnailVariant = "A" | "B";
 
 export interface VideoRecord {
   id: string;
@@ -40,6 +46,18 @@ export interface VideoRecord {
   thumbnail_uploaded: boolean;
   quality_score: string | null;
   quality_notes: string | null;
+  video_type: VideoType;
+  parent_video_id: string | null;
+  clip_start_seconds: string | null;
+  clip_duration_seconds: string | null;
+  thumbnail_variant: ThumbnailVariant;
+  thumbnail_b_text: string | null;
+  thumbnail_b_prompt: string | null;
+  thumbnail_swapped_at: Date | null;
+  short_youtube_video_id: string | null;
+  engagement_applied: boolean;
+  pinned_comment_id: string | null;
+  pinned_comment_text: string | null;
   published_at: Date | null;
 }
 
@@ -57,6 +75,7 @@ export interface PendingVideoView {
   ctr: number;
   thumbnail_uploaded: boolean;
   quality_score: number | null;
+  short_youtube_video_id: string | null;
 }
 
 export interface PipelineResult {
@@ -71,6 +90,10 @@ export interface PipelineResult {
   autoPublished: boolean;
   qualityScore: number | null;
   qualityNotes: string | null;
+  shortVideoId: string | null;
+  shortVideoUrl: string | null;
+  thumbnailVariant: ThumbnailVariant;
+  engagementApplied: boolean;
 }
 
 export interface CostSummaryRow {
@@ -111,4 +134,20 @@ export interface TopicCandidate {
   score: number;
   rationale: string;
   searchIntent: string;
+}
+
+export interface ThumbnailVariants {
+  variantAPath: string;
+  variantBPath: string;
+}
+
+export interface ShortClipPlan {
+  startSeconds: number;
+  durationSeconds: number;
+  title: string;
+}
+
+export interface ShortUploadResult {
+  videoId: string;
+  videoUrl: string;
 }

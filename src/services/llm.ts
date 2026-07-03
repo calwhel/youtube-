@@ -42,6 +42,10 @@ interface VideoPayload {
   tags: string[];
   thumbnail_prompt: string;
   thumbnail_text: string;
+  thumbnail_b_prompt: string;
+  thumbnail_b_text: string;
+  short_title: string;
+  pinned_comment: string;
   chapters: Array<{ timestamp: string; title: string }>;
   scenes: Array<{
     voiceover_text: string;
@@ -57,6 +61,10 @@ Retention and packaging rules:
 - tags: 10-15 high-intent tags mixing broad and long-tail
 - thumbnail_prompt: bold, high-contrast, single focal subject, readable at mobile size, no clutter
 - thumbnail_text: max 4 words, ALL CAPS friendly, complements (does not duplicate) the title
+- thumbnail_b_prompt: alternate thumbnail image prompt — different angle/composition from variant A, same topic
+- thumbnail_b_text: alternate thumbnail overlay text — different hook angle from thumbnail_text (max 4 words)
+- short_title: punchy Shorts title under 70 chars ending with #Shorts — optimized for the hook clip
+- pinned_comment: engaging question to pin on the video (1-2 sentences, drives comments)
 - chapters: 4-8 entries with MM:SS timestamps starting at 00:00; align to scene boundaries
 - scenes: 6-10 scenes
 
@@ -110,6 +118,10 @@ function assertVideoPayload(value: unknown): VideoPayload {
     "description",
     "thumbnail_prompt",
     "thumbnail_text",
+    "thumbnail_b_prompt",
+    "thumbnail_b_text",
+    "short_title",
+    "pinned_comment",
   ] as const;
 
   for (const key of requiredStrings) {

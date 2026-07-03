@@ -4,14 +4,17 @@ Multi-tenant automated YouTube video generation and upload pipeline built with T
 
 ## Growth-focused pipeline
 
-Each run follows a **research → script → voice → video → thumbnail → quality gate → publish** flow optimized for views and monetization:
+Each run follows a **research → script → voice → video → thumbnail → Shorts → quality gate → publish** flow:
 
-1. **Topic research** — YouTube autocomplete + Claude scoring, informed by top-performing past topics
-2. **Retention script** — Hook-first structure, target duration, chapters, SEO metadata
-3. **Per-scene TTS** — ElevenLabs per scene with ffmpeg concat and duration metadata for Creatomate
-4. **Custom thumbnail** — Creatomate thumbnail template or ffmpeg frame extract → `thumbnails.set`
-5. **Quality gate** — Scores title, hook, length, tags; blocks auto-publish if below threshold
-6. **Analytics sync** — Daily cron pulls views, CTR, AVD; feeds topic research loop
+1. **Topic research** — YouTube autocomplete + Claude scoring, informed by top performers
+2. **Retention script** — Hook-first structure, A/B thumbnail copy, Shorts title, pinned comment
+3. **Per-scene TTS** — ElevenLabs per scene with ffmpeg concat and Creatomate duration sync
+4. **Custom thumbnails** — A/B variants (Creatomate or ffmpeg); variant A uploaded first
+5. **Shorts derivative** — 30–59s vertical clip from hook, uploaded alongside long-form
+6. **Engagement automation** — Playlist insert, watch-next link, pinned comment on publish
+7. **Quality gate** — Scores packaging; optional auto-publish when score ≥ 70
+8. **Analytics + A/B** — Daily sync; auto-swap to thumbnail B if CTR underperforms after 24h
+9. **Webhooks** — Slack/Discord alerts for pending review, publish, failures, monetization
 
 ## Architecture
 
@@ -19,14 +22,15 @@ Each run follows a **research → script → voice → video → thumbnail → q
 flowchart LR
   Cron[node-cron] --> Research[Topic Research]
   Research --> LLM[Claude Script]
-  LLM --> Voice[ElevenLabs per scene]
+  LLM --> Voice[ElevenLabs]
   Voice --> Video[Creatomate]
   Video --> YT[YouTube Upload]
-  YT --> Thumb[Custom Thumbnail]
-  Thumb --> QG[Quality Gate]
-  QG --> Pub[Auto or Manual Publish]
-  Analytics[Daily Analytics Sync] --> DB[(Postgres)]
-  DB --> Research
+  YT --> Thumb[A/B Thumbnails]
+  Thumb --> Shorts[Shorts Clip]
+  Shorts --> QG[Quality Gate]
+  QG --> Pub[Publish + Engagement]
+  Analytics[Analytics + A/B Cron] --> DB[(Postgres)]
+  Webhooks[Slack / Discord] --> Pub
 ```
 
 ## Quick Start
@@ -35,82 +39,67 @@ flowchart LR
 cp .env.example .env
 npm install
 npm run build
-npm run migrate-channel   # one-time: import legacy .env channel into DB
+npm run migrate-channel
 npm start
 ```
 
-Trigger a channel pipeline manually:
-
-```bash
-curl -X POST http://localhost:3000/api/run-pipeline \
-  -H "x-auth-token: $AUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"channel_id":"<uuid>","topic":"Optional specific topic"}'
-```
-
-## Per-channel growth settings
+## Per-channel settings
 
 | Field | Default | Purpose |
 |-------|---------|---------|
-| `target_duration_minutes` | 10 | Script length target (~150 words/min) |
-| `audience_level` | general | beginner / intermediate / advanced / general |
-| `title_style` | curiosity | curiosity / question / listicle / story / controversy |
-| `auto_publish` | false | Publish automatically when quality gate passes (≥70) |
-| `require_thumbnail` | true | Quality gate requires custom thumbnail upload |
-| `youtube_category_id` | 28 | Per-channel YouTube category |
-| `creatomate_thumbnail_template_id` | — | Optional dedicated thumbnail template |
+| `target_duration_minutes` | 10 | Script length target |
+| `auto_publish` | false | Auto-publish when quality ≥ 70 |
+| `auto_generate_shorts` | true | Create vertical Short from hook |
+| `enable_ab_thumbnails` | true | Generate + track A/B thumbnail variants |
+| `enable_engagement` | true | Playlist, watch-next, pinned comment |
+| `default_playlist_id` | — | YouTube playlist for binge watching |
 
 ## API Endpoints
 
-All routes require `x-auth-token: <AUTH_TOKEN>` (or `Authorization: Bearer`).
+All routes require `x-auth-token: <AUTH_TOKEN>`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/channels` | Create a channel |
-| `GET` | `/api/channels` | List channels with stats |
-| `PATCH` | `/api/channels/:id` | Update channel settings |
-| `POST` | `/api/run-pipeline` | Run full pipeline for a channel |
-| `GET` | `/api/pending` | Private videos awaiting review |
-| `POST` | `/api/publish/:video_id` | Manually publish a reviewed video |
-| `GET` | `/api/costs` | Monthly cost summary |
-| `GET` | `/api/monetization` | Refresh channel stats + sync video analytics |
-| `POST` | `/api/analytics/sync` | Trigger analytics sync manually |
+| `POST` | `/api/run-pipeline` | Run full pipeline |
+| `GET` | `/api/pending` | Videos awaiting review |
+| `POST` | `/api/publish/:video_id` | Publish + engagement automation |
+| `POST` | `/api/analytics/sync` | Sync views, CTR, monetization stats |
+| `POST` | `/api/thumbnails/ab-evaluate` | Run thumbnail A/B swap evaluation |
+| `GET` | `/api/monetization` | Channel monetization + analytics sync |
 
 ## Cron jobs
 
 | Schedule | Job |
 |----------|-----|
-| Per channel `upload_frequency` | Generate + upload video |
-| Every 5 minutes | Reload channel cron jobs |
-| Daily 03:00 UTC | Sync YouTube analytics for all videos/channels |
+| Per channel `upload_frequency` | Generate pipeline run |
+| Every 5 min | Reload channel cron jobs |
+| Daily 03:00 UTC | Analytics sync + monetization webhooks |
+| Daily 04:00 UTC | Thumbnail A/B evaluation + auto-swap |
+
+## Webhooks
+
+Set `SLACK_WEBHOOK_URL` and/or `DISCORD_WEBHOOK_URL` in Railway. Notifications fire for:
+
+- **Pending review** — video ready, awaiting manual publish
+- **Published** — video went public with engagement applied
+- **Pipeline failed** — generation error with message
+- **Monetization approaching** — 800+ subs and 3500+ watch hours
+- **Monetization eligible** — 1K subs + 4K watch hours reached
+- **Thumbnail A/B swap** — variant B applied due to low CTR
+
+Toggle with `WEBHOOK_NOTIFY_*` env vars (see `.env.example`).
 
 ## OAuth scopes
 
-Run `npm run get-token` to obtain a refresh token. Required scopes:
+Run `npm run get-token` — requires re-auth after upgrades:
 
-- `youtube.upload`
-- `youtube.readonly`
-- `yt-analytics.readonly` (watch hours, CTR, impressions)
-
-**Re-run OAuth for existing channels** after upgrading — analytics requires the new scope.
+- `youtube.upload`, `youtube.readonly`, `yt-analytics.readonly`, `youtube.force-ssl`
 
 ## Environment Variables
 
-See [`.env.example`](.env.example). Required:
+Required: `NEON_DATABASE_URL`, `ENCRYPTION_KEY`, `AUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `CREATOMATE_API_KEY`, `PUBLIC_BASE_URL`
 
-- `NEON_DATABASE_URL`, `ENCRYPTION_KEY`, `AUTH_TOKEN`
-- `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `CREATOMATE_API_KEY`
-- `PUBLIC_BASE_URL` (Railway public URL)
-- `CREATOMATE_THUMBNAIL_TEMPLATE_ID` (recommended for CTR)
-
-## Development
-
-```bash
-npm run dev
-npm run typecheck
-```
-
-Production Docker image includes **ffmpeg** for audio concat and thumbnail frame extraction.
+Recommended: `CREATOMATE_THUMBNAIL_TEMPLATE_ID`, `SLACK_WEBHOOK_URL` or `DISCORD_WEBHOOK_URL`
 
 ## License
 

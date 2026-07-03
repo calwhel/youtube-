@@ -27,6 +27,14 @@ export interface PlatformConfig {
     baseDelayMs: number;
     maxDelayMs: number;
   };
+  notifications: {
+    slackWebhookUrl: string | null;
+    discordWebhookUrl: string | null;
+    notifyPending: boolean;
+    notifyMonetization: boolean;
+    notifyPublish: boolean;
+    notifyFailure: boolean;
+  };
 }
 
 function requireEnv(name: string): string {
@@ -132,6 +140,15 @@ export function loadConfig(): PlatformConfig {
         optionalEnv("RETRY_MAX_DELAY_MS", "30000"),
         30_000,
       ),
+    },
+    notifications: {
+      slackWebhookUrl: process.env.SLACK_WEBHOOK_URL?.trim() || null,
+      discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL?.trim() || null,
+      notifyPending: optionalEnv("WEBHOOK_NOTIFY_PENDING", "true") === "true",
+      notifyMonetization:
+        optionalEnv("WEBHOOK_NOTIFY_MONETIZATION", "true") === "true",
+      notifyPublish: optionalEnv("WEBHOOK_NOTIFY_PUBLISH", "true") === "true",
+      notifyFailure: optionalEnv("WEBHOOK_NOTIFY_FAILURE", "true") === "true",
     },
   };
 

@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS channels (
   youtube_category_id TEXT NOT NULL DEFAULT '28',
   creatomate_thumbnail_template_id TEXT,
   require_thumbnail BOOLEAN NOT NULL DEFAULT TRUE,
+  auto_generate_shorts BOOLEAN NOT NULL DEFAULT TRUE,
+  enable_ab_thumbnails BOOLEAN NOT NULL DEFAULT TRUE,
+  enable_engagement BOOLEAN NOT NULL DEFAULT TRUE,
+  default_playlist_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -41,6 +45,19 @@ CREATE TABLE IF NOT EXISTS videos (
   thumbnail_uploaded BOOLEAN DEFAULT FALSE,
   quality_score NUMERIC(5, 2),
   quality_notes TEXT,
+  video_type TEXT NOT NULL DEFAULT 'long' CHECK (video_type IN ('long', 'short')),
+  parent_video_id UUID REFERENCES videos(id) ON DELETE SET NULL,
+  clip_start_seconds NUMERIC(8, 2),
+  clip_duration_seconds NUMERIC(8, 2),
+  thumbnail_variant TEXT NOT NULL DEFAULT 'A' CHECK (thumbnail_variant IN ('A', 'B')),
+  thumbnail_b_text TEXT,
+  thumbnail_b_prompt TEXT,
+  thumbnail_swapped_at TIMESTAMPTZ,
+  short_youtube_video_id TEXT,
+  pinned_comment_text TEXT,
+  engagement_applied BOOLEAN NOT NULL DEFAULT FALSE,
+  pinned_comment_id TEXT,
+  pinned_comment_text TEXT,
   published_at TIMESTAMPTZ
 );
 
@@ -59,6 +76,7 @@ CREATE TABLE IF NOT EXISTS channel_stats (
   subs_count BIGINT DEFAULT 0,
   watch_hours_total NUMERIC(12, 2) DEFAULT 0,
   monetization_eligible BOOLEAN DEFAULT FALSE,
+  monetization_alert_sent BOOLEAN DEFAULT FALSE,
   last_checked_at TIMESTAMPTZ
 );
 

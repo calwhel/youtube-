@@ -33,6 +33,10 @@ function mapChannelPublic(
     youtube_category_id: channel.youtube_category_id,
     creatomate_thumbnail_template_id: channel.creatomate_thumbnail_template_id,
     require_thumbnail: channel.require_thumbnail,
+    auto_generate_shorts: channel.auto_generate_shorts,
+    enable_ab_thumbnails: channel.enable_ab_thumbnails,
+    enable_engagement: channel.enable_engagement,
+    default_playlist_id: channel.default_playlist_id,
     created_at: channel.created_at.toISOString(),
     stats: stats
       ? {
@@ -139,9 +143,13 @@ export class ChannelRepository {
         auto_publish,
         youtube_category_id,
         creatomate_thumbnail_template_id,
-        require_thumbnail
+        require_thumbnail,
+        auto_generate_shorts,
+        enable_ab_thumbnails,
+        enable_engagement,
+        default_playlist_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
       RETURNING *
       `,
       [
@@ -162,6 +170,10 @@ export class ChannelRepository {
         input.youtube_category_id ?? "28",
         input.creatomate_thumbnail_template_id ?? null,
         input.require_thumbnail ?? true,
+        input.auto_generate_shorts ?? true,
+        input.enable_ab_thumbnails ?? true,
+        input.enable_engagement ?? true,
+        input.default_playlist_id ?? null,
       ],
     );
 
@@ -210,7 +222,11 @@ export class ChannelRepository {
         auto_publish = COALESCE($15, auto_publish),
         youtube_category_id = COALESCE($16, youtube_category_id),
         creatomate_thumbnail_template_id = COALESCE($17, creatomate_thumbnail_template_id),
-        require_thumbnail = COALESCE($18, require_thumbnail)
+        require_thumbnail = COALESCE($18, require_thumbnail),
+        auto_generate_shorts = COALESCE($19, auto_generate_shorts),
+        enable_ab_thumbnails = COALESCE($20, enable_ab_thumbnails),
+        enable_engagement = COALESCE($21, enable_engagement),
+        default_playlist_id = COALESCE($22, default_playlist_id)
       WHERE id = $1
       RETURNING *
       `,
@@ -237,6 +253,10 @@ export class ChannelRepository {
         input.youtube_category_id ?? null,
         input.creatomate_thumbnail_template_id ?? null,
         input.require_thumbnail ?? null,
+        input.auto_generate_shorts ?? null,
+        input.enable_ab_thumbnails ?? null,
+        input.enable_engagement ?? null,
+        input.default_playlist_id ?? null,
       ],
     );
 
@@ -245,6 +265,21 @@ export class ChannelRepository {
     }
 
     return mapChannelPublic(row, await this.getStats(id));
+  }
+
+  async markMonetizationAlertSent(channelId: string): Promise<void> {
+    await query(
+      `
+      UPDATE channel_stats
+      SET monetization_alert_sent = TRUE
+      WHERE channel_id = $1
+      `,
+      [channelId],
+    );
+  }
+
+  async getStatsRaw(channelId: string): Promise<ChannelStatsRecord | null> {
+    return this.getStats(channelId);
   }
 
   async delete(id: string): Promise<boolean> {
@@ -275,6 +310,7 @@ export class ChannelRepository {
       subs_count: number;
       watch_hours_total: number;
       monetization_eligible: boolean;
+      monetization_alert_sent?: boolean;
     },
     client?: PoolClient,
   ): Promise<void> {
@@ -284,14 +320,16 @@ export class ChannelRepository {
         subs_count,
         watch_hours_total,
         monetization_eligible,
+        monetization_alert_sent,
         last_checked_at
       )
-      VALUES ($1, $2, $3, $4, NOW())
+      VALUES ($1, $2, $3, $4, COALESCE($5, FALSE), NOW())
       ON CONFLICT (channel_id)
       DO UPDATE SET
         subs_count = EXCLUDED.subs_count,
         watch_hours_total = EXCLUDED.watch_hours_total,
         monetization_eligible = EXCLUDED.monetization_eligible,
+        monetization_alert_sent = COALESCE(EXCLUDED.monetization_alert_sent, channel_stats.monetization_alert_sent),
         last_checked_at = NOW()
     `;
     const params = [
@@ -299,6 +337,7 @@ export class ChannelRepository {
       stats.subs_count,
       stats.watch_hours_total,
       stats.monetization_eligible,
+      stats.monetization_alert_sent ?? null,
     ];
 
     if (client) {

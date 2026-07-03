@@ -1,7 +1,9 @@
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
+import type { PlatformConfig } from "../config";
 import type { ServiceConfig } from "../config/channel-config";
-import type { VideoPayload } from "../types/video";
+import type { ThumbnailVariants, VideoPayload } from "../types/video";
 import { extractVideoFrame } from "../utils/ffmpeg";
 import { sleep, withRetry } from "../utils/tmp";
 
@@ -14,9 +16,36 @@ interface CreatomateRenderResponse {
 
 export class ThumbnailService {
   private readonly config: ServiceConfig;
+  private readonly platform: PlatformConfig;
 
-  constructor(config: ServiceConfig) {
+  constructor(config: ServiceConfig, platform: PlatformConfig) {
     this.config = config;
+    this.platform = platform;
+  }
+
+  async generateVariants(
+    payload: VideoPayload,
+    runDir: string,
+    localVideoPath?: string,
+  ): Promise<ThumbnailVariants> {
+    const variantAPath = path.join(runDir, "thumbnail-a.jpg");
+    const variantBPath = path.join(runDir, "thumbnail-b.jpg");
+
+    await this.renderVariant(payload, variantAPath, "A", localVideoPath);
+    await this.renderVariant(payload, variantBPath, "B", localVideoPath);
+
+    return { variantAPath, variantBPath };
+  }
+
+  async generateVariantB(
+    payload: VideoPayload,
+    cacheKey: string,
+  ): Promise<string> {
+    const cacheDir = path.join(this.platform.tmpDir, "thumbnail-cache", cacheKey);
+    await mkdir(cacheDir, { recursive: true });
+    const outputPath = path.join(cacheDir, "variant-b.jpg");
+    await this.renderVariant(payload, outputPath, "B");
+    return outputPath;
   }
 
   async generateThumbnail(
@@ -25,32 +54,50 @@ export class ThumbnailService {
     localVideoPath?: string,
   ): Promise<string> {
     const outputPath = path.join(runDir, "thumbnail.jpg");
+    await this.renderVariant(payload, outputPath, "A", localVideoPath);
+    return outputPath;
+  }
+
+  private async renderVariant(
+    payload: VideoPayload,
+    outputPath: string,
+    variant: "A" | "B",
+    localVideoPath?: string,
+  ): Promise<void> {
+    const thumbnailPrompt =
+      variant === "B" ? payload.thumbnail_b_prompt : payload.thumbnail_prompt;
+    const thumbnailText =
+      variant === "B" ? payload.thumbnail_b_text : payload.thumbnail_text;
 
     if (this.config.creatomate.thumbnailTemplateId) {
       try {
-        return await this.renderCreatomateThumbnail(payload, outputPath);
+        await this.renderCreatomateThumbnail(
+          { ...payload, thumbnail_prompt: thumbnailPrompt, thumbnail_text: thumbnailText },
+          outputPath,
+        );
+        return;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.warn(
-          `[thumbnail] Creatomate render failed, falling back to frame extract: ${message}`,
+          `[thumbnail] Creatomate variant ${variant} failed, falling back: ${message}`,
         );
       }
     }
 
     if (!localVideoPath) {
       throw new Error(
-        "No thumbnail template configured and no video available for frame extraction",
+        `No thumbnail template configured and no video for variant ${variant}`,
       );
     }
 
-    await extractVideoFrame(localVideoPath, outputPath, 3);
-    return outputPath;
+    const seekSeconds = variant === "B" ? 8 : 3;
+    await extractVideoFrame(localVideoPath, outputPath, seekSeconds);
   }
 
   private async renderCreatomateThumbnail(
     payload: VideoPayload,
     outputPath: string,
-  ): Promise<string> {
+  ): Promise<void> {
     const templateId = this.config.creatomate.thumbnailTemplateId;
     if (!templateId) {
       throw new Error("Creatomate thumbnail template ID is not configured");
@@ -107,7 +154,6 @@ export class ThumbnailService {
     const buffer = Buffer.from(await imageResponse.arrayBuffer());
     const { writeFile } = await import("node:fs/promises");
     await writeFile(outputPath, buffer);
-    return outputPath;
   }
 
   private async pollRender(renderId: string): Promise<string> {

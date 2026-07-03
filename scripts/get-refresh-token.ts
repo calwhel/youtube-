@@ -12,6 +12,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
   "https://www.googleapis.com/auth/youtube.readonly",
   "https://www.googleapis.com/auth/yt-analytics.readonly",
+  "https://www.googleapis.com/auth/youtube.force-ssl",
 ];
 
 dotenv.config({ path: path.join(PROJECT_ROOT, ".env") });

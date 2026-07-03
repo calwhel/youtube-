@@ -101,6 +101,13 @@ function parseCreateChannelBody(body: unknown): CreateChannelInput {
         ? record.creatomate_thumbnail_template_id.trim()
         : undefined,
     require_thumbnail: parseOptionalBoolean(record.require_thumbnail),
+    auto_generate_shorts: parseOptionalBoolean(record.auto_generate_shorts),
+    enable_ab_thumbnails: parseOptionalBoolean(record.enable_ab_thumbnails),
+    enable_engagement: parseOptionalBoolean(record.enable_engagement),
+    default_playlist_id:
+      typeof record.default_playlist_id === "string"
+        ? record.default_playlist_id.trim()
+        : undefined,
   };
 }
 
@@ -191,6 +198,33 @@ function parseUpdateChannelBody(body: unknown): UpdateChannelInput {
       throw new Error("Invalid field: require_thumbnail");
     }
     input.require_thumbnail = record.require_thumbnail;
+  }
+
+  for (const field of [
+    "auto_generate_shorts",
+    "enable_ab_thumbnails",
+    "enable_engagement",
+  ] as const) {
+    if (record[field] !== undefined) {
+      if (typeof record[field] !== "boolean") {
+        throw new Error(`Invalid field: ${field}`);
+      }
+      input[field] = record[field];
+    }
+  }
+
+  if (record.default_playlist_id !== undefined) {
+    if (
+      record.default_playlist_id !== null &&
+      (typeof record.default_playlist_id !== "string" ||
+        record.default_playlist_id.trim() === "")
+    ) {
+      throw new Error("Invalid field: default_playlist_id");
+    }
+    input.default_playlist_id =
+      record.default_playlist_id === null
+        ? null
+        : record.default_playlist_id.trim();
   }
 
   return input;

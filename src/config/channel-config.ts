@@ -63,6 +63,10 @@ export function buildServiceConfig(
       titleStyle: channel.title_style,
       autoPublish: channel.auto_publish,
       requireThumbnail: channel.require_thumbnail,
+      autoGenerateShorts: channel.auto_generate_shorts,
+      enableAbThumbnails: channel.enable_ab_thumbnails,
+      enableEngagement: channel.enable_engagement,
+      defaultPlaylistId: channel.default_playlist_id,
     },
   };
 }

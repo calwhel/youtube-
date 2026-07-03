@@ -1,12 +1,12 @@
 import type { Request, Response, Router } from "express";
 
-import { buildServiceConfig } from "../config/channel-config";
 import type { PlatformConfig } from "../config";
 import { ChannelRepository } from "../db/repositories/channels";
 import { VideoRepository } from "../db/repositories/videos";
 import type { PipelineOrchestrator } from "../pipeline";
 import { AnalyticsSyncService } from "../services/analytics-sync";
-import { YouTubeService } from "../services/youtube";
+import { PublishFinalizer } from "../services/publish-finalizer";
+import { ThumbnailAbService } from "../services/thumbnail-ab";
 
 const runningChannels = new Set<string>();
 
@@ -94,10 +94,14 @@ export function createPipelineRoutes(
     }
 
     try {
-      const serviceConfig = buildServiceConfig(platform, channel);
-      const youtube = new YouTubeService(serviceConfig);
-      await youtube.publishVideo(video.youtube_video_id);
-      const updated = await videos.markPublished(video.id);
+      const finalizer = new PublishFinalizer(platform);
+      await finalizer.finalize({
+        dbVideoId: video.id,
+        channelId: video.channel_id,
+        youtubeVideoId: video.youtube_video_id,
+        shortYoutubeVideoId: video.short_youtube_video_id,
+      });
+      const updated = await videos.findById(video.id);
 
       res.status(200).json({
         success: true,
@@ -140,6 +144,17 @@ export function createPipelineRoutes(
     try {
       const sync = new AnalyticsSyncService(platform);
       const result = await sync.syncAll();
+      res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  router.post("/thumbnails/ab-evaluate", async (_req, res) => {
+    try {
+      const ab = new ThumbnailAbService(platform);
+      const result = await ab.evaluateAndSwapAll();
       res.status(200).json({ success: true, ...result });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

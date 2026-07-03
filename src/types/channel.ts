@@ -32,7 +32,23 @@ export interface ChannelRecord {
   youtube_category_id: string;
   creatomate_thumbnail_template_id: string | null;
   require_thumbnail: boolean;
+  auto_generate_shorts: boolean;
+  enable_ab_thumbnails: boolean;
+  enable_engagement: boolean;
+  default_playlist_id: string | null;
   created_at: Date;
+}
+
+export interface ContentSettings {
+  targetDurationMinutes: number;
+  audienceLevel: AudienceLevel;
+  titleStyle: TitleStyle;
+  autoPublish: boolean;
+  requireThumbnail: boolean;
+  autoGenerateShorts: boolean;
+  enableAbThumbnails: boolean;
+  enableEngagement: boolean;
+  defaultPlaylistId: string | null;
 }
 
 export interface ChannelStatsRecord {
@@ -41,6 +57,7 @@ export interface ChannelStatsRecord {
   subs_count: string;
   watch_hours_total: string;
   monetization_eligible: boolean;
+  monetization_alert_sent: boolean;
   last_checked_at: Date | null;
 }
 
@@ -62,6 +79,10 @@ export interface CreateChannelInput {
   youtube_category_id?: string;
   creatomate_thumbnail_template_id?: string;
   require_thumbnail?: boolean;
+  auto_generate_shorts?: boolean;
+  enable_ab_thumbnails?: boolean;
+  enable_engagement?: boolean;
+  default_playlist_id?: string;
 }
 
 export interface UpdateChannelInput {
@@ -82,6 +103,10 @@ export interface UpdateChannelInput {
   youtube_category_id?: string;
   creatomate_thumbnail_template_id?: string | null;
   require_thumbnail?: boolean;
+  auto_generate_shorts?: boolean;
+  enable_ab_thumbnails?: boolean;
+  enable_engagement?: boolean;
+  default_playlist_id?: string | null;
 }
 
 export interface ChannelPublicView {
@@ -101,6 +126,10 @@ export interface ChannelPublicView {
   youtube_category_id: string;
   creatomate_thumbnail_template_id: string | null;
   require_thumbnail: boolean;
+  auto_generate_shorts: boolean;
+  enable_ab_thumbnails: boolean;
+  enable_engagement: boolean;
+  default_playlist_id: string | null;
   created_at: string;
   stats: {
     subs_count: number;
@@ -108,12 +137,4 @@ export interface ChannelPublicView {
     monetization_eligible: boolean;
     last_checked_at: string | null;
   } | null;
-}
-
-export interface ContentSettings {
-  targetDurationMinutes: number;
-  audienceLevel: AudienceLevel;
-  titleStyle: TitleStyle;
-  autoPublish: boolean;
-  requireThumbnail: boolean;
 }
