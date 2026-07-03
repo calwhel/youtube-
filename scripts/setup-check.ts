@@ -4,7 +4,7 @@ import path from "node:path";
 import dotenv from "dotenv";
 
 import { loadConfig } from "../src/config";
-import { bootstrapSchema, closePool, getPool } from "../src/db/pool";
+import { closePool, getPool } from "../src/db/pool";
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
