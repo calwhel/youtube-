@@ -3,6 +3,7 @@ dist/
 .env
 .env.local
 .refresh-token.txt
+channel.json
 scripts/*.js
 scripts/*.js.map
 scripts/*.d.ts

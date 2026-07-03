@@ -1,0 +1,29 @@
+{
+  "name": "My Channel",
+  "niche_prompt": "I analyze overlooked space missions from an engineer's perspective — specific missions, real tradeoffs, and what textbooks skip. Every video must take a clear stance backed by primary sources.",
+  "youtube_client_id": "YOUR_GOOGLE_CLIENT_ID",
+  "youtube_client_secret": "YOUR_GOOGLE_CLIENT_SECRET",
+  "youtube_refresh_token": "YOUR_REFRESH_TOKEN_FROM_npm_run_get-token",
+  "elevenlabs_voice_id": "YOUR_ELEVENLABS_VOICE_ID",
+  "creatomate_template_id": "YOUR_PRIMARY_CREATOMATE_TEMPLATE_ID",
+  "creatomate_template_ids": [
+    "YOUR_PRIMARY_CREATOMATE_TEMPLATE_ID",
+    "YOUR_SECOND_CREATOMATE_TEMPLATE_ID"
+  ],
+  "creatomate_thumbnail_template_id": "YOUR_THUMBNAIL_TEMPLATE_ID",
+  "upload_frequency": "0 14 * * *",
+  "monthly_budget_usd": 100,
+  "status": "active",
+  "target_duration_minutes": 10,
+  "audience_level": "general",
+  "title_style": "curiosity",
+  "auto_publish": false,
+  "auto_generate_shorts": true,
+  "enable_ab_thumbnails": true,
+  "enable_engagement": true,
+  "default_playlist_id": "",
+  "review_mode": "required",
+  "min_manual_publishes_before_auto": 5,
+  "max_videos_per_week": 3,
+  "disclose_synthetic_media": true
+}

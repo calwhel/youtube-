@@ -41,11 +41,16 @@ flowchart LR
 
 ```bash
 cp .env.example .env
+# Fill in secrets — see DEPLOY.md for the full walkthrough
 npm install
 npm run build
-npm run migrate-channel
+npm run setup-check
+npm run bootstrap-db
+npm run create-channel -- channel.json   # or: npm run migrate-channel
 npm start
 ```
+
+**Full setup guide:** [DEPLOY.md](./DEPLOY.md) — OAuth, Creatomate, Railway, daily workflow.
 
 ## Per-channel settings
 
@@ -57,6 +62,11 @@ npm start
 | `enable_ab_thumbnails` | true | Generate + track A/B thumbnail variants |
 | `enable_engagement` | true | Playlist, watch-next, pinned comment |
 | `default_playlist_id` | — | YouTube playlist for binge watching |
+| `creatomate_template_ids` | `[]` | Template rotation pool (2+ recommended for YPP) |
+| `review_mode` | required | `required` blocks auto_publish until N manual publishes |
+| `min_manual_publishes_before_auto` | 5 | Manual approvals before auto_publish allowed |
+| `max_videos_per_week` | 3 | Slow-lane cap (0 = unlimited) |
+| `disclose_synthetic_media` | true | Sets YouTube `containsSyntheticMedia` on upload |
 
 ## API Endpoints
 
@@ -69,6 +79,8 @@ All routes require `x-auth-token: <AUTH_TOKEN>`.
 | `POST` | `/api/publish/:video_id` | Publish + engagement automation |
 | `POST` | `/api/analytics/sync` | Sync views, CTR, monetization stats |
 | `POST` | `/api/thumbnails/ab-evaluate` | Run thumbnail A/B swap evaluation |
+| `GET` | `/api/monetization/readiness` | YPP readiness report for all channels |
+| `GET` | `/api/monetization/readiness/:channel_id` | YPP readiness for one channel |
 | `GET` | `/api/monetization` | Channel monetization + analytics sync |
 
 ## Cron jobs
