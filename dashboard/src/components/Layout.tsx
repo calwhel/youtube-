@@ -342,8 +342,7 @@ export function DatabaseSetupBanner() {
         <li>Wait for redeploy (~1 min), then refresh this page</li>
       </ol>
       <p className="mt-3 text-xs text-amber-200/70">
-        Then open the <strong>Connect</strong> tab (hamburger menu on mobile) to link your YouTube channel — or run{" "}
-        <code className="rounded bg-black/20 px-1">npm run setup</code> locally.
+        Then open <strong>Connect</strong> (hamburger menu on mobile) to link YouTube — all in the browser, no terminal.
       </p>
     </div>
   );
