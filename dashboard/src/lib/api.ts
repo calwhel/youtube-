@@ -267,7 +267,9 @@ export const api = {
     }),
 
   youtubeOAuthToken: (state: string) =>
-    request<{ refresh_token: string }>(
-      `/api/youtube/oauth/token?state=${encodeURIComponent(state)}`,
-    ),
+    request<{
+      refresh_token: string;
+      client_id: string;
+      client_secret: string;
+    }>(`/api/youtube/oauth/token?state=${encodeURIComponent(state)}`),
 };

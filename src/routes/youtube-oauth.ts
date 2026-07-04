@@ -3,7 +3,7 @@ import { google } from "googleapis";
 
 import type { PlatformConfig } from "../config";
 import {
-  consumePendingRefreshToken,
+  consumePendingOAuthSession,
   createPendingOAuth,
   getPendingOAuth,
   setPendingOAuthResult,
@@ -99,13 +99,17 @@ export function createYoutubeOAuthRoutes(
       return;
     }
 
-    const refreshToken = consumePendingRefreshToken(state);
-    if (!refreshToken) {
+    const session = consumePendingOAuthSession(state);
+    if (!session) {
       res.status(404).json({ error: "OAuth session expired. Connect again." });
       return;
     }
 
-    res.json({ refresh_token: refreshToken });
+    res.json({
+      refresh_token: session.refreshToken,
+      client_id: session.clientId,
+      client_secret: session.clientSecret,
+    });
   });
 }
 

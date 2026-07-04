@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2,
   ChevronDown,
@@ -56,16 +56,44 @@ function GuideSection({
   );
 }
 
+const SETUP_DRAFT_KEY = "pipeline_setup_draft";
+
+type SetupDraft = {
+  name: string;
+  niche_prompt: string;
+  youtube_client_id: string;
+  youtube_client_secret: string;
+  elevenlabs_voice_id: string;
+};
+
+function loadSetupDraft(): Partial<SetupDraft> {
+  try {
+    const raw = sessionStorage.getItem(SETUP_DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as Partial<SetupDraft>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSetupDraft(form: SetupDraft): void {
+  sessionStorage.setItem(SETUP_DRAFT_KEY, JSON.stringify(form));
+}
+
+function clearSetupDraft(): void {
+  sessionStorage.removeItem(SETUP_DRAFT_KEY);
+}
+
 const emptyForm = {
   name: "",
   niche_prompt: "",
   youtube_client_id: "",
   youtube_client_secret: "",
   youtube_refresh_token: "",
-  elevenlabs_voice_id: "",
+  elevenlabs_voice_id: "21m00Tcm4TlvDq8ikWAM",
 };
 
 export function SetupPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +104,10 @@ export function SetupPage() {
   const [youtubeConnected, setYoutubeConnected] = useState(false);
   const [redirectUri, setRedirectUri] = useState("");
   const [copied, setCopied] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => ({
+    ...emptyForm,
+    ...loadSetupDraft(),
+  }));
 
   useEffect(() => {
     void load();
@@ -85,6 +116,16 @@ export function SetupPage() {
       .then((res) => setRedirectUri(res.redirect_uri))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    saveSetupDraft({
+      name: form.name,
+      niche_prompt: form.niche_prompt,
+      youtube_client_id: form.youtube_client_id,
+      youtube_client_secret: form.youtube_client_secret,
+      elevenlabs_voice_id: form.elevenlabs_voice_id,
+    });
+  }, [form.name, form.niche_prompt, form.youtube_client_id, form.youtube_client_secret, form.elevenlabs_voice_id]);
 
   useEffect(() => {
     const oauthResult = searchParams.get("youtube_oauth");
@@ -129,10 +170,12 @@ export function SetupPage() {
       const res = await api.youtubeOAuthToken(state);
       setForm((prev) => ({
         ...prev,
+        youtube_client_id: res.client_id,
+        youtube_client_secret: res.client_secret,
         youtube_refresh_token: res.refresh_token,
       }));
       setYoutubeConnected(true);
-      setSuccess("YouTube connected! Finish the form below and save your channel.");
+      setSuccess("YouTube connected! Tap Save channel below — your details are kept.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to finish YouTube sign-in");
     } finally {
@@ -154,6 +197,13 @@ export function SetupPage() {
         form.youtube_client_id.trim(),
         form.youtube_client_secret.trim(),
       );
+      saveSetupDraft({
+        name: form.name,
+        niche_prompt: form.niche_prompt,
+        youtube_client_id: form.youtube_client_id,
+        youtube_client_secret: form.youtube_client_secret,
+        elevenlabs_voice_id: form.elevenlabs_voice_id,
+      });
       window.location.href = res.auth_url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start YouTube sign-in");
@@ -179,10 +229,11 @@ export function SetupPage() {
         status: "active",
         upload_frequency: "0 14 * * *",
       });
-      setSuccess(`Channel "${res.channel.name}" saved! Open Create to generate your first video.`);
-      setForm(emptyForm);
+      setSuccess(`Channel "${res.channel.name}" saved!`);
+      clearSetupDraft();
       setYoutubeConnected(false);
       await load();
+      navigate("/generate");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect channel");
     } finally {
@@ -325,8 +376,23 @@ export function SetupPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="glass rounded-2xl p-6 shadow-card space-y-4">
+            {channels.length > 0 ? (
+              <div className="space-y-4">
+                <h2 className="font-display text-lg font-semibold text-emerald-400 flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" /> Channel already connected
+                </h2>
+                <p className="text-sm text-zinc-400">
+                  You&apos;re set up. Generate a video or add another channel below.
+                </p>
+                <Link to="/generate" className="btn-primary inline-flex w-full justify-center">
+                  <Sparkles className="h-4 w-4" /> Generate video
+                </Link>
+              </div>
+            ) : null}
+
             <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-              <Link2 className="h-5 w-5 text-brand" /> Your channel
+              <Link2 className="h-5 w-5 text-brand" />
+              {channels.length > 0 ? "Add another channel" : "Your channel"}
             </h2>
 
             <Field label="Channel name" value={form.name} onChange={(v) => update("name", v)} placeholder="My Finance Channel" />
@@ -340,8 +406,19 @@ export function SetupPage() {
 
             <div className="rounded-xl border border-surface-border/60 bg-surface-overlay/40 p-4 space-y-3">
               <p className="text-xs font-medium text-zinc-300">YouTube (Google OAuth)</p>
-              <Field label="Google Client ID" value={form.youtube_client_id} onChange={(v) => update("youtube_client_id", v)} />
-              <Field label="Google Client Secret" value={form.youtube_client_secret} onChange={(v) => update("youtube_client_secret", v)} type="password" />
+              <Field
+                label="Google Client ID"
+                value={form.youtube_client_id}
+                onChange={(v) => update("youtube_client_id", v)}
+                required={!youtubeConnected}
+              />
+              <Field
+                label="Google Client Secret"
+                value={form.youtube_client_secret}
+                onChange={(v) => update("youtube_client_secret", v)}
+                type="password"
+                required={!youtubeConnected}
+              />
 
               <button
                 type="button"
@@ -386,6 +463,7 @@ function Field({
   placeholder,
   type = "text",
   multiline = false,
+  required = true,
 }: {
   label: string;
   value: string;
@@ -393,6 +471,7 @@ function Field({
   placeholder?: string;
   type?: string;
   multiline?: boolean;
+  required?: boolean;
 }) {
   return (
     <div>
@@ -404,7 +483,7 @@ function Field({
           placeholder={placeholder}
           rows={3}
           className="input-field resize-none"
-          required
+          required={required ?? true}
         />
       ) : (
         <input
@@ -413,7 +492,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="input-field"
-          required
+          required={required ?? true}
         />
       )}
     </div>

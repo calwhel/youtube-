@@ -59,13 +59,21 @@ export function setPendingOAuthResult(
   return true;
 }
 
-export function consumePendingRefreshToken(state: string): string | null {
+export function consumePendingOAuthSession(state: string): {
+  refreshToken: string;
+  clientId: string;
+  clientSecret: string;
+} | null {
   const entry = pending.get(state);
   if (!entry?.refreshToken) {
     return null;
   }
 
-  const token = entry.refreshToken;
+  const session = {
+    refreshToken: entry.refreshToken,
+    clientId: entry.clientId,
+    clientSecret: entry.clientSecret,
+  };
   pending.delete(state);
-  return token;
+  return session;
 }
