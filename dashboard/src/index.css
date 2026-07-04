@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-surface-border;
+  }
+
+  body {
+    @apply min-h-screen bg-surface text-zinc-100;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255, 0, 51, 0.12), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(99, 102, 241, 0.08), transparent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-surface-border;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply border border-surface-border/80 bg-surface-raised/80 backdrop-blur-xl;
+  }
+
+  .glass-hover {
+    @apply transition-all duration-200 hover:border-zinc-600/50 hover:bg-surface-overlay/90;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-glow transition-all duration-200 hover:bg-brand-glow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-surface-border bg-surface-overlay px-5 py-2.5 text-sm font-medium text-zinc-200 transition-all duration-200 hover:border-zinc-500 hover:bg-surface-border/50 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-surface-overlay hover:text-white;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-surface-border bg-surface-overlay px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-all focus:border-brand/50 focus:ring-2 focus:ring-brand/20;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-500/15 text-red-400 ring-1 ring-red-500/30;
+  }
+
+  .badge-neutral {
+    @apply badge bg-zinc-500/15 text-zinc-400 ring-1 ring-zinc-500/30;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all duration-200;
+  }
+
+  .nav-item-active {
+    @apply nav-item bg-brand/10 text-white ring-1 ring-brand/20;
+  }
+
+  .nav-item-inactive {
+    @apply nav-item hover:bg-surface-overlay hover:text-zinc-200;
+  }
+}

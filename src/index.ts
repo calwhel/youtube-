@@ -1,4 +1,5 @@
 import express from "express";
+import path from "node:path";
 
 import { loadConfig } from "./config";
 import { createAuthMiddleware } from "./middleware/auth";
@@ -28,15 +29,6 @@ async function main(): Promise<void> {
     });
   });
 
-  app.get("/", (_req, res) => {
-    res.status(200).json({
-      status: "ok",
-      message: "YouTube pipeline is running",
-      health: "/health",
-      api: "/api (requires x-auth-token header)",
-    });
-  });
-
   app.get("/internal/assets/:token", (req, res) => {
     const asset = streamTransientAsset(req.params.token);
     if (!asset) {
@@ -49,10 +41,17 @@ async function main(): Promise<void> {
     asset.stream.pipe(res);
   });
 
+  const publicDir = path.join(__dirname, "public");
+  app.use(express.static(publicDir));
+
   const apiRouter = express.Router();
   createChannelRoutes(apiRouter, platform);
   createPipelineRoutes(apiRouter, platform, orchestrator);
   app.use("/api", authenticate, apiRouter);
+
+  app.get(/^\/(?!api|internal|health).*/, (_req, res) => {
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
 
   app.listen(platform.port, () => {
     console.log(

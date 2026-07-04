@@ -39,7 +39,9 @@ flowchart LR
 
 ## Quick Start
 
-Two files: `.env` (platform keys) + `channel.json` (your channel).
+Open your Railway domain in a browser — **Pipeline Studio** is the web dashboard.
+
+Two config files for first-time setup: `.env` (platform keys) + `channel.json` (your channel).
 
 ```bash
 cp .env.example .env          # fill in Neon + API keys
