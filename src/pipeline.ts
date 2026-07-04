@@ -74,7 +74,10 @@ export class PipelineOrchestrator {
     }
 
     const videoIndex = await this.videos.countTotalLongForm(channel.id);
-    const selectedTemplateId = pickCreatomateTemplate(channel, videoIndex);
+    const selectedTemplateId =
+      this.platform.videoRenderer === "ffmpeg"
+        ? "ffmpeg"
+        : pickCreatomateTemplate(channel, videoIndex);
     const serviceConfig = buildServiceConfig(
       this.platform,
       channel,

@@ -9,6 +9,7 @@ import {
   revokeTransientAsset,
 } from "../utils/assets";
 import { sleep, withRetry } from "../utils/tmp";
+import { renderVideoWithFfmpeg } from "./video-ffmpeg";
 
 interface CreatomateRenderResponse {
   id: string;
@@ -141,6 +142,16 @@ export class VideoService {
     voiceoverPath: string,
     runDir: string,
   ): Promise<{ renderedVideoUrl: string; localVideoPath: string }> {
+    if (this.config.videoRenderer === "ffmpeg") {
+      return withRetry(
+        () => renderVideoWithFfmpeg(payload, voiceoverPath, runDir),
+        {
+          ...this.config.retry,
+          label: "ffmpeg-render",
+        },
+      );
+    }
+
     return withRetry(
       async () => {
         const { audioSource, assetToken } =

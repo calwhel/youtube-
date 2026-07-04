@@ -7,6 +7,7 @@ export interface ServiceConfig {
   port: number;
   authToken: string;
   tmpDir: string;
+  videoRenderer: PlatformConfig["videoRenderer"];
   anthropic: PlatformConfig["anthropic"];
   elevenlabs: PlatformConfig["elevenlabs"] & { voiceId: string };
   creatomate: PlatformConfig["creatomate"] & {
@@ -37,6 +38,7 @@ export function buildServiceConfig(
     port: platform.port,
     authToken: platform.authToken,
     tmpDir: platform.tmpDir,
+    videoRenderer: platform.videoRenderer,
     anthropic: platform.anthropic,
     elevenlabs: {
       ...platform.elevenlabs,

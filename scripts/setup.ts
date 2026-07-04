@@ -57,7 +57,8 @@ async function main(): Promise<void> {
   if (isPlaceholder(input.elevenlabs_voice_id)) {
     missing.push("elevenlabs_voice_id");
   }
-  if (isPlaceholder(input.creatomate_template_id)) {
+  const useFfmpeg = process.env.VIDEO_RENDERER?.trim().toLowerCase() === "ffmpeg";
+  if (!useFfmpeg && isPlaceholder(input.creatomate_template_id)) {
     missing.push("creatomate_template_id");
   }
 

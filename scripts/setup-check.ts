@@ -54,7 +54,7 @@ async function checkDatabase(): Promise<void> {
     process.env.RAILWAY_DATABASE_URL?.trim();
 
   if (!url) {
-    record("database", false, "NEON_DATABASE_URL not set");
+    record("database", false, "set DATABASE_URL (Railway Postgres) or NEON_DATABASE_URL");
     return;
   }
 
@@ -128,10 +128,13 @@ async function main(): Promise<void> {
 
   checkEnv("AUTH_TOKEN");
   checkEnv("ENCRYPTION_KEY");
-  checkEnv("NEON_DATABASE_URL");
+  checkEnv("NEON_DATABASE_URL", false);
+  checkEnv("DATABASE_URL", false);
   checkEnv("ANTHROPIC_API_KEY");
   checkEnv("ELEVENLABS_API_KEY");
-  checkEnv("CREATOMATE_API_KEY");
+  const useFfmpeg = process.env.VIDEO_RENDERER?.trim().toLowerCase() === "ffmpeg";
+  checkEnv("CREATOMATE_API_KEY", !useFfmpeg);
+  checkEnv("VIDEO_RENDERER", false);
   checkEnv("PUBLIC_BASE_URL", false);
   checkEnv("YOUTUBE_CLIENT_ID", false);
   checkEnv("YOUTUBE_CLIENT_SECRET", false);

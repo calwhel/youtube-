@@ -1,8 +1,11 @@
+export type VideoRenderer = "creatomate" | "ffmpeg";
+
 export interface PlatformConfig {
   port: number;
   authToken: string;
   tmpDir: string;
   encryptionKey: string;
+  videoRenderer: VideoRenderer;
   anthropic: {
     apiKey: string;
     model: string;
@@ -85,6 +88,10 @@ function parsePrivacyStatus(value: string): "private" | "unlisted" {
   );
 }
 
+function parseVideoRenderer(value: string): VideoRenderer {
+  return value.toLowerCase() === "ffmpeg" ? "ffmpeg" : "creatomate";
+}
+
 let cachedConfig: PlatformConfig | null = null;
 
 export function loadConfig(): PlatformConfig {
@@ -92,11 +99,22 @@ export function loadConfig(): PlatformConfig {
     return cachedConfig;
   }
 
+  const videoRenderer = parseVideoRenderer(
+    optionalEnv("VIDEO_RENDERER", "creatomate"),
+  );
+  const creatomateApiKey = process.env.CREATOMATE_API_KEY?.trim() ?? "";
+  if (videoRenderer === "creatomate" && creatomateApiKey === "") {
+    throw new Error(
+      "Missing CREATOMATE_API_KEY. Set it or use VIDEO_RENDERER=ffmpeg for free local rendering.",
+    );
+  }
+
   cachedConfig = {
     port: parsePositiveInt(optionalEnv("PORT", "3000"), 3000),
     authToken: requireEnv("AUTH_TOKEN"),
     tmpDir: optionalEnv("TMP_DIR", "/tmp"),
     encryptionKey: requireEnv("ENCRYPTION_KEY"),
+    videoRenderer,
     anthropic: {
       apiKey: requireEnv("ANTHROPIC_API_KEY"),
       model: optionalEnv(
@@ -109,7 +127,7 @@ export function loadConfig(): PlatformConfig {
       modelId: optionalEnv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2"),
     },
     creatomate: {
-      apiKey: requireEnv("CREATOMATE_API_KEY"),
+      apiKey: creatomateApiKey,
       pollIntervalMs: parsePositiveInt(
         optionalEnv("CREATOMATE_POLL_INTERVAL_MS", "5000"),
         5000,

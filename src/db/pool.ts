@@ -13,7 +13,7 @@ export function getDatabaseUrl(): string {
 
   if (!url) {
     throw new Error(
-      "Missing database URL. Set NEON_DATABASE_URL or DATABASE_URL.",
+      "Missing database URL. Add Railway Postgres (DATABASE_URL) or set NEON_DATABASE_URL.",
     );
   }
 
