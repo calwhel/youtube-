@@ -2,7 +2,7 @@ import cron, { type ScheduledTask } from "node-cron";
 
 import type { PlatformConfig } from "./config";
 import { ChannelRepository } from "./db/repositories/channels";
-import { bootstrapSchema } from "./db/pool";
+import { bootstrapSchema, waitForDatabase } from "./db/pool";
 import type { PipelineOrchestrator } from "./pipeline";
 import { runPipelineForChannel } from "./routes/pipeline";
 import { AnalyticsSyncService } from "./services/analytics-sync";
@@ -23,6 +23,7 @@ export class ChannelScheduler {
   }
 
   async start(): Promise<void> {
+    await waitForDatabase();
     await bootstrapSchema();
     await this.reloadJobs();
 

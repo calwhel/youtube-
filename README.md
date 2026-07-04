@@ -52,6 +52,15 @@ npm start
 
 **Setup guide:** [DEPLOY.md](./DEPLOY.md)
 
+## Railway (auto-deploy from GitHub)
+
+1. Push this repo to GitHub
+2. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
+3. Paste variables from `railway.env.example` into Railway → **Variables**
+4. Every push to `main` builds the Docker image and deploys automatically
+
+After deploy, run `npm run setup` locally once (with production `NEON_DATABASE_URL` in `.env`) to create your channel in the database.
+
 ## Per-channel settings
 
 | Field | Default | Purpose |

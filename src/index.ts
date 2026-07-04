@@ -45,12 +45,15 @@ async function main(): Promise<void> {
   createPipelineRoutes(apiRouter, platform, orchestrator);
   app.use("/api", authenticate, apiRouter);
 
-  await scheduler.start();
-
   app.listen(platform.port, () => {
     console.log(
       `YouTube pipeline server listening on port ${platform.port}`,
     );
+
+    void scheduler.start().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[scheduler] failed to start: ${message}`);
+    });
   });
 }
 

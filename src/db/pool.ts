@@ -69,6 +69,30 @@ export async function withTransaction<T>(
   }
 }
 
+export async function waitForDatabase(
+  maxAttempts = 30,
+  delayMs = 5000,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await getPool().query("SELECT 1");
+      if (attempt > 1) {
+        console.log(`[db] connected on attempt ${attempt}`);
+      }
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[db] connect attempt ${attempt}/${maxAttempts} failed: ${message}`,
+      );
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 export async function bootstrapSchema(): Promise<void> {
   const schemaPath = path.join(__dirname, "schema.sql");
   const schemaSql = await readFile(schemaPath, "utf8");
