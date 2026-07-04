@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Clapperboard, Eye, Loader2 } from "lucide-react";
 
 import { api, type Channel, type VideoActivity } from "../lib/api";
+import { formatPipelineError } from "../lib/errors";
 import {
   EmptyState,
   ErrorBanner,
@@ -76,13 +77,7 @@ export function GeneratePage() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load";
-      setError(
-        message === "Unauthorized"
-          ? "Session expired — log in again with AUTH_TOKEN. Your YouTube channel stays connected."
-          : message === "Load failed" || message === "Failed to fetch"
-            ? "Connection lost. Pull down to refresh or reopen the app."
-            : message,
-      );
+      setError(formatPipelineError(message));
     } finally {
       setLoading(false);
     }
@@ -105,7 +100,11 @@ export function GeneratePage() {
           setSuccess("Video ready! Open Review to watch and publish.");
         } else if (failed?.quality_notes || res.last_error?.message) {
           setSuccess("");
-          setError(failed?.quality_notes ?? res.last_error?.message ?? "Generation failed.");
+          setError(
+            formatPipelineError(
+              failed?.quality_notes ?? res.last_error?.message ?? "Generation failed.",
+            ),
+          );
         } else if (stuck) {
           setSuccess("Still processing on server — check again in a few minutes.");
         } else {
@@ -146,16 +145,11 @@ export function GeneratePage() {
           "Already creating a video for this channel. Check Review in a few minutes.",
         );
         message = "";
-      } else if (message === "Unauthorized") {
-        message =
-          "Login expired. Menu → Sign Out, then log in with AUTH_TOKEN from Railway → Variables.";
-      } else if (message.includes("claude-3-5-sonnet") || message.includes("not_found_error")) {
-        message =
-          "AI model outdated. In Railway → Variables, set ANTHROPIC_MODEL to claude-sonnet-4-6, redeploy, then try again.";
-      } else if (message === "Load failed" || message === "Failed to fetch") {
-        message =
-          "Connection dropped — but generation may still be running on the server. Check Review in 5–10 minutes.";
-        setBackgroundRunning(true);
+      } else {
+        message = formatPipelineError(message);
+        if (message.includes("Connection dropped")) {
+          setBackgroundRunning(true);
+        }
       }
       if (message) {
         setError(message);

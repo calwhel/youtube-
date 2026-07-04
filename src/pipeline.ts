@@ -18,6 +18,7 @@ import type { PipelineResult } from "./types/video";
 import { estimatePipelineCostUsd } from "./utils/cost";
 import { canAutoPublish, pickCreatomateTemplate } from "./utils/template-picker";
 import { cleanupTmpDir, ensureTmpDir } from "./utils/tmp";
+import { formatYouTubeAuthError } from "./utils/youtube-auth-error";
 
 export interface RunPipelineOptions {
   channelId: string;
@@ -298,14 +299,15 @@ export class PipelineOrchestrator {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.videos.markFailed(videoRecord.id, message);
+      const formatted = formatYouTubeAuthError(message);
+      await this.videos.markFailed(videoRecord.id, formatted);
       await this.notifications.notify({
         event: "pipeline_failed",
         channelName: channel.name,
         topic: selectedTopic,
-        error: message,
+        error: formatted,
       });
-      throw error;
+      throw new Error(formatted);
     } finally {
       await cleanupTmpDir(runDir);
       console.log(`[pipeline] cleaned up ${runDir}`);

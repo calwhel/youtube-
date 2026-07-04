@@ -1,12 +1,15 @@
 import type { Request, Response, Router } from "express";
 
 import type { PlatformConfig } from "../config";
+import { buildServiceConfig } from "../config/channel-config";
 import {
   ChannelRepository,
   isAudienceLevel,
   isReviewMode,
   isTitleStyle,
 } from "../db/repositories/channels";
+import { YouTubeService } from "../services/youtube";
+import { formatYouTubeAuthError } from "../utils/youtube-auth-error";
 import type {
   CreateChannelInput,
   UpdateChannelInput,
@@ -325,6 +328,33 @@ export function createChannelRoutes(
     }
 
     res.status(200).json({ channel });
+  });
+
+  router.get("/channels/:id/youtube-status", async (req, res) => {
+    try {
+      const channel = await channels.findDecryptedById(req.params.id);
+      if (!channel) {
+        res.status(404).json({ error: "Channel not found" });
+        return;
+      }
+
+      const serviceConfig = buildServiceConfig(platform, channel);
+      const youtube = new YouTubeService(serviceConfig);
+      const result = await youtube.verifyConnection();
+
+      res.status(200).json({
+        ok: true,
+        connected: true,
+        channel_title: result.channelTitle,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(200).json({
+        ok: false,
+        connected: false,
+        error: formatYouTubeAuthError(message),
+      });
+    }
   });
 
   router.patch("/channels/:id", async (req, res) => {
