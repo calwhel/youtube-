@@ -297,8 +297,8 @@ export class PipelineOrchestrator {
         engagementApplied,
       };
     } catch (error) {
-      await this.videos.markFailed(videoRecord.id);
       const message = error instanceof Error ? error.message : String(error);
+      await this.videos.markFailed(videoRecord.id, message);
       await this.notifications.notify({
         event: "pipeline_failed",
         channelName: channel.name,
