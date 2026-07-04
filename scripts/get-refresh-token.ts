@@ -1,9 +1,17 @@
+import { existsSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import dotenv from "dotenv";
 import { google } from "googleapis";
+
+import {
+  DEFAULT_CHANNEL_FILE,
+  loadChannelFile,
+  readOAuthCredentialsFromRecord,
+  saveRefreshTokenToChannelFile,
+} from "./lib/channel-json";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const REDIRECT_URI = "http://localhost:53682/oauth2callback";
@@ -17,15 +25,32 @@ const SCOPES = [
 
 dotenv.config({ path: path.join(PROJECT_ROOT, ".env") });
 
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
+async function resolveOAuthCredentials(): Promise<{
+  clientId: string;
+  clientSecret: string;
+  channelFile: string | null;
+}> {
+  const channelFile = process.argv[2] ?? DEFAULT_CHANNEL_FILE;
+  const channelPath = path.resolve(PROJECT_ROOT, channelFile);
+
+  if (existsSync(channelPath)) {
+    const { raw } = await loadChannelFile(channelFile);
+    const fromChannel = readOAuthCredentialsFromRecord(raw);
+    if (fromChannel) {
+      return { ...fromChannel, channelFile };
+    }
+  }
+
+  const clientId = process.env.YOUTUBE_CLIENT_ID?.trim();
+  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) {
     console.error(
-      `Error: ${name} is not set. Add it to ${path.join(PROJECT_ROOT, ".env")} and try again.`,
+      `Add youtube_client_id and youtube_client_secret to ${channelFile}, then run again.`,
     );
     process.exit(1);
   }
-  return value;
+
+  return { clientId, clientSecret, channelFile: null };
 }
 
 function parseCallbackUrl(requestUrl: string): URL {
@@ -38,8 +63,7 @@ function sendHtml(res: ServerResponse, statusCode: number, body: string): void {
 }
 
 async function main(): Promise<void> {
-  const clientId = requireEnv("YOUTUBE_CLIENT_ID");
-  const clientSecret = requireEnv("YOUTUBE_CLIENT_SECRET");
+  const { clientId, clientSecret, channelFile } = await resolveOAuthCredentials();
 
   const oauth2Client = new google.auth.OAuth2(
     clientId,
@@ -54,13 +78,10 @@ async function main(): Promise<void> {
     redirect_uri: REDIRECT_URI,
   });
 
-  console.log("Opening consent URL...");
+  console.log("Open this URL in your browser and authorize your YouTube channel:");
   console.log("");
   console.log(consentUrl);
   console.log("");
-  console.log(
-    "Open the URL above in your browser and authorize with the Google account that owns the target YouTube channel.",
-  );
   console.log("Waiting for authorization...");
 
   await new Promise<void>((resolve, reject) => {
@@ -104,12 +125,12 @@ async function main(): Promise<void> {
           sendHtml(
             res,
             400,
-            "<h1>Token exchange failed</h1><p>No refresh token was returned. Try revoking app access in your Google account and run the script again.</p>",
+            "<h1>Token exchange failed</h1><p>No refresh token was returned. Revoke app access in Google Account settings and try again.</p>",
           );
           server.close();
           reject(
             new Error(
-              "Token exchange succeeded but no refresh_token was returned. Re-run with prompt=consent after revoking prior app access.",
+              "No refresh_token returned. Revoke prior app access and re-run.",
             ),
           );
           return;
@@ -121,27 +142,28 @@ async function main(): Promise<void> {
           mode: 0o600,
         });
 
-        console.log("Refresh token obtained. Add this to Railway as YOUTUBE_REFRESH_TOKEN:");
+        if (channelFile) {
+          await saveRefreshTokenToChannelFile(channelFile, refreshToken);
+          console.log(`Saved refresh token to ${channelFile}`);
+        }
+
         console.log("");
+        console.log("Refresh token:");
         console.log(refreshToken);
         console.log("");
-        console.log(`Saved refresh token to ${tokenFilePath}`);
+        console.log("Next: npm run setup");
 
         sendHtml(
           res,
           200,
-          "<h1>Authorization complete</h1><p>Refresh token captured. You can close this tab and return to your terminal.</p>",
+          "<h1>Authorization complete</h1><p>Refresh token saved. Close this tab and run <code>npm run setup</code>.</p>",
         );
 
         server.close(() => resolve());
       } catch (tokenError) {
         const message =
           tokenError instanceof Error ? tokenError.message : String(tokenError);
-        sendHtml(
-          res,
-          500,
-          `<h1>Token exchange failed</h1><p>${message}</p>`,
-        );
+        sendHtml(res, 500, `<h1>Token exchange failed</h1><p>${message}</p>`);
         server.close();
         reject(
           tokenError instanceof Error

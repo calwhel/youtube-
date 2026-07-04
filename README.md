@@ -39,18 +39,18 @@ flowchart LR
 
 ## Quick Start
 
+Two files: `.env` (platform keys) + `channel.json` (your channel).
+
 ```bash
-cp .env.example .env
-# Fill in secrets — see DEPLOY.md for the full walkthrough
-npm install
-npm run build
-npm run setup-check
-npm run bootstrap-db
-npm run create-channel -- channel.json   # or: npm run migrate-channel
+cp .env.example .env          # fill in Neon + API keys
+cp channel.example.json channel.json   # fill in niche, OAuth, voice, templates
+npm install && npm run build
+npm run get-token             # browser OAuth → saves token to channel.json
+npm run setup                 # creates DB + registers channel
 npm start
 ```
 
-**Full setup guide:** [DEPLOY.md](./DEPLOY.md) — OAuth, Creatomate, Railway, daily workflow.
+**Setup guide:** [DEPLOY.md](./DEPLOY.md)
 
 ## Per-channel settings
 

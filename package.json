@@ -9,7 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "get-token": "ts-node scripts/get-refresh-token.ts",
-    "migrate-channel": "ts-node scripts/migrate-existing-channel.ts",
+    "setup": "ts-node scripts/setup.ts",
     "setup-check": "ts-node scripts/setup-check.ts",
     "bootstrap-db": "ts-node scripts/bootstrap-db.ts",
     "create-channel": "ts-node scripts/create-channel.ts"
