@@ -30,6 +30,52 @@ export class VideoRepository {
     return row;
   }
 
+  async failStaleProcessing(
+    channelId: string,
+    maxAgeMinutes = 45,
+  ): Promise<number> {
+    const rows = await query<{ id: string }>(
+      `
+      UPDATE videos
+      SET
+        status = 'failed',
+        quality_notes = COALESCE(
+          quality_notes,
+          'Pipeline timed out — server may have restarted. Try generating again.'
+        )
+      WHERE channel_id = $1
+        AND status = 'processing'
+        AND created_at < NOW() - make_interval(mins => $2::int)
+      RETURNING id
+      `,
+      [channelId, maxAgeMinutes],
+    );
+    return rows.length;
+  }
+
+  async failOtherProcessing(
+    channelId: string,
+    keepVideoId: string,
+  ): Promise<number> {
+    const rows = await query<{ id: string }>(
+      `
+      UPDATE videos
+      SET
+        status = 'failed',
+        quality_notes = COALESCE(
+          quality_notes,
+          'Replaced by a newer pipeline run.'
+        )
+      WHERE channel_id = $1
+        AND status = 'processing'
+        AND id <> $2
+      RETURNING id
+      `,
+      [channelId, keepVideoId],
+    );
+    return rows.length;
+  }
+
   async markPrivate(
     videoId: string,
     data: {
@@ -461,7 +507,7 @@ export class VideoRepository {
         AND v.status IN ('processing', 'private', 'failed')
         ${channelFilter}
       ORDER BY v.created_at DESC
-      LIMIT 10
+      LIMIT 20
       `,
       params,
     );

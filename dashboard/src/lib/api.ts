@@ -95,6 +95,8 @@ export interface PendingVideo {
   quality_score: number | null;
   short_youtube_video_id: string | null;
   thumbnail_uploaded: boolean;
+  preview_only?: boolean;
+  preview_available?: boolean;
 }
 
 export interface VideoReviewView {
@@ -273,11 +275,24 @@ export const api = {
     request<{
       activity: VideoActivity[];
       last_error: { message: string; at: string } | null;
+      last_success: {
+        video_id: string;
+        title: string | null;
+        preview: boolean;
+        at: string;
+      } | null;
     }>(
       channelId
         ? `/api/videos/activity?channel_id=${encodeURIComponent(channelId)}`
         : "/api/videos/activity",
     ),
+
+  reviewQueue: () =>
+    request<{
+      ready: PendingVideo[];
+      processing: VideoActivity[];
+      failed: VideoActivity[];
+    }>("/api/review/queue"),
 
   runPipeline: (channelId: string, topic?: string, skipYoutube?: boolean) =>
     request<PipelineStartResult>("/api/run-pipeline", {

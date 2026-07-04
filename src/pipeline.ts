@@ -103,6 +103,8 @@ export class PipelineOrchestrator {
     const excludedTopics = await this.topicsUsed.listTopicTexts(channel.id);
     const topPerformers = await this.videos.getTopPerformingTopics(channel.id);
 
+    await this.videos.failStaleProcessing(channel.id);
+
     const selectedTopic = await topicResearch.selectTopic({
       excludedTopics,
       topPerformers,
@@ -113,6 +115,7 @@ export class PipelineOrchestrator {
       channel.id,
       selectedTopic,
     );
+    await this.videos.failOtherProcessing(channel.id, videoRecord.id);
 
     const runDir = await ensureTmpDir(this.platform);
     console.log(
@@ -296,6 +299,9 @@ export class PipelineOrchestrator {
         thumbnailText: payload.thumbnail_text,
         shortTitle: payload.short_title,
       });
+      console.log(
+        `[pipeline] ready for review: id=${videoRecord.id} preview=${skipYoutube}`,
+      );
       await this.topicsUsed.recordTopic(channel.id, payload.topic);
 
       if (mayAutoPublish && uploadVideoId) {
@@ -353,13 +359,20 @@ export class PipelineOrchestrator {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const formatted = formatYouTubeAuthError(message);
-      await this.videos.markFailed(videoRecord.id, formatted);
-      await this.notifications.notify({
-        event: "pipeline_failed",
-        channelName: channel.name,
-        topic: selectedTopic,
-        error: formatted,
-      });
+      const current = await this.videos.findById(videoRecord.id);
+      if (current?.status === "processing") {
+        await this.videos.markFailed(videoRecord.id, formatted);
+        await this.notifications.notify({
+          event: "pipeline_failed",
+          channelName: channel.name,
+          topic: selectedTopic,
+          error: formatted,
+        });
+      } else {
+        console.warn(
+          `[pipeline] error after video ${videoRecord.id} reached status=${current?.status}: ${formatted}`,
+        );
+      }
       throw new Error(formatted);
     } finally {
       await cleanupTmpDir(runDir);
