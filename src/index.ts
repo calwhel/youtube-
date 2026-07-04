@@ -4,7 +4,7 @@ import path from "node:path";
 import { loadConfig } from "./config";
 import { createAuthMiddleware } from "./middleware/auth";
 import { PipelineOrchestrator } from "./pipeline";
-import { createAuthRoutes } from "./routes/auth";
+import { createAuthRoutes, createPublicAuthRoutes } from "./routes/auth";
 import { createChannelRoutes } from "./routes/channels";
 import {
   createPipelineRoutes,
@@ -56,8 +56,10 @@ async function main(): Promise<void> {
   const publicDir = path.join(__dirname, "public");
   app.use(express.static(publicDir));
 
+  createPublicAuthRoutes(app, platform);
+
   const apiRouter = express.Router();
-  createAuthRoutes(apiRouter);
+  createAuthRoutes(apiRouter, platform);
   createYoutubeOAuthRoutes(apiRouter, platform);
   createChannelRoutes(apiRouter, platform);
   createPipelineRoutes(apiRouter, platform, orchestrator);

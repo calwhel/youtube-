@@ -82,7 +82,10 @@ function DesktopSidebar() {
       </nav>
 
       <div className="border-t border-surface-border/60 p-4">
-        <button onClick={logout} className="nav-item-inactive w-full">
+        <button
+          onClick={() => void logout()}
+          className="nav-item-inactive w-full"
+        >
           <LogOut className="h-4 w-4" />
           Sign Out
         </button>
@@ -157,7 +160,7 @@ function MobileDrawer({
         <div className="border-t border-surface-border/60 p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             onClick={() => {
-              logout();
+              void logout();
               onClose();
             }}
             className="nav-item-inactive w-full"

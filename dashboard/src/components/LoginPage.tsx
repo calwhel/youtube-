@@ -4,29 +4,19 @@ import { Film, KeyRound, Sparkles } from "lucide-react";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
-async function parseErrorResponse(response: Response): Promise<string> {
-  try {
-    const data = (await response.json()) as { error?: string };
-    if (data.error) {
-      return data.error;
-    }
-  } catch {
-    // not JSON — fall through
-  }
-  return `Server error (${response.status})`;
-}
-
 export function LoginPage() {
   const { login } = useAuth();
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     setWarning("");
+    setSuccess("");
     setLoading(true);
 
     try {
@@ -35,38 +25,26 @@ export function LoginPage() {
         throw new ApiError("Please paste your auth token", 400);
       }
 
-      const response = await fetch("/api/auth/verify", {
-        headers: { "x-auth-token": trimmed },
-      });
+      const session = await login(trimmed);
 
-      if (response.status === 401) {
-        throw new ApiError(
-          "Wrong token — copy AUTH_TOKEN exactly from Railway → Variables",
-          401,
-        );
-      }
-
-      if (!response.ok) {
-        throw new ApiError(await parseErrorResponse(response), response.status);
-      }
-
-      const data = (await response.json()) as {
-        ok?: boolean;
-        database?: string;
-        database_error?: string;
-      };
-
-      if (data.database === "disconnected") {
+      if (session.database === "disconnected") {
         setWarning(
-          "Logged in, but database is not connected. Link Postgres DATABASE_URL in Railway, then run npm run setup.",
+          "Logged in, but database is not connected. Link Postgres DATABASE_URL in Railway, then refresh.",
         );
       }
 
-      login(trimmed);
+      if (session.channels.length > 0) {
+        const names = session.channels.map((channel) => channel.name).join(", ");
+        setSuccess(
+          `Welcome back — ${names} ${session.channels.length === 1 ? "is" : "are"} still connected. You do not need to reconnect YouTube.`,
+        );
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
-          ? err.message
+          ? err.status === 401
+            ? "Wrong token — copy AUTH_TOKEN exactly from Railway → Variables"
+            : err.message
           : "Could not reach server — check your Railway app is running.",
       );
     } finally {
@@ -121,9 +99,15 @@ export function LoginPage() {
             </div>
           )}
 
+          {success && (
+            <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+              {success}
+            </div>
+          )}
+
           <button type="submit" disabled={loading} className="btn-primary w-full">
             <Sparkles className="h-4 w-4" />
-            {loading ? "Connecting..." : "Enter Dashboard"}
+            {loading ? "Signing in..." : "Enter Dashboard"}
           </button>
 
           <p className="mt-6 text-center text-xs leading-relaxed text-zinc-500">
@@ -131,7 +115,7 @@ export function LoginPage() {
             <code className="rounded bg-surface-overlay px-1.5 py-0.5 text-zinc-400">
               AUTH_TOKEN
             </code>{" "}
-            exactly (no spaces)
+            once. Your login stays saved for a year — reconnecting YouTube is only needed if you delete your channel from the app.
           </p>
         </form>
       </div>

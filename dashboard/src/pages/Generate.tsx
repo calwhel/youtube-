@@ -78,7 +78,7 @@ export function GeneratePage() {
       const message = err instanceof Error ? err.message : "Failed to load";
       setError(
         message === "Unauthorized"
-          ? "Login expired. Sign out and log in again with AUTH_TOKEN from Railway → Variables."
+          ? "Session expired — log in again with AUTH_TOKEN. Your YouTube channel stays connected."
           : message === "Load failed" || message === "Failed to fetch"
             ? "Connection lost. Pull down to refresh or reopen the app."
             : message,
