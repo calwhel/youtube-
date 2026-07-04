@@ -2,12 +2,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 
-import { clearToken, getToken, setToken } from "./api";
+import { clearToken, getToken, setToken, setUnauthorizedHandler } from "./api";
 
 interface AuthContextValue {
   token: string | null;
@@ -30,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearToken();
     setTokenState(null);
   }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(logout);
+    return () => setUnauthorizedHandler(() => {});
+  }, [logout]);
 
   const value = useMemo(
     () => ({

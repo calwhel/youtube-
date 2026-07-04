@@ -77,9 +77,11 @@ export function GeneratePage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load";
       setError(
-        message === "Load failed" || message === "Failed to fetch"
-          ? "Connection lost. Pull down to refresh or reopen the app."
-          : message,
+        message === "Unauthorized"
+          ? "Login expired. Sign out and log in again with AUTH_TOKEN from Railway → Variables."
+          : message === "Load failed" || message === "Failed to fetch"
+            ? "Connection lost. Pull down to refresh or reopen the app."
+            : message,
       );
     } finally {
       setLoading(false);
@@ -144,6 +146,9 @@ export function GeneratePage() {
           "Already creating a video for this channel. Check Review in a few minutes.",
         );
         message = "";
+      } else if (message === "Unauthorized") {
+        message =
+          "Login expired. Menu → Sign Out, then log in with AUTH_TOKEN from Railway → Variables.";
       } else if (message.includes("claude-3-5-sonnet") || message.includes("not_found_error")) {
         message =
           "AI model outdated. In Railway → Variables, set ANTHROPIC_MODEL to claude-sonnet-4-6, redeploy, then try again.";

@@ -22,6 +22,12 @@ export class ApiError extends Error {
   }
 }
 
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -40,6 +46,10 @@ async function request<T>(
   >;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearToken();
+      onUnauthorized?.();
+    }
     throw new ApiError(
       (data.error as string) || `Request failed (${response.status})`,
       response.status,
