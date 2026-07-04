@@ -13,6 +13,7 @@ import { YppReadinessService } from "../services/ypp-readiness";
 import {
   getPreviewThumbnailPath,
   getPreviewVideoPath,
+  previewVideoExists,
 } from "../utils/preview-storage";
 
 const runningChannels = new Set<string>();
@@ -20,6 +21,16 @@ const lastPipelineErrors = new Map<
   string,
   { message: string; at: string }
 >();
+const lastPipelineSuccess = new Map<
+  string,
+  { video_id: string; title: string | null; preview: boolean; at: string }
+>();
+
+export function getLastPipelineSuccess(
+  channelId: string,
+): { video_id: string; title: string | null; preview: boolean; at: string } | null {
+  return lastPipelineSuccess.get(channelId) ?? null;
+}
 
 export function getLastPipelineError(
   channelId: string,
@@ -77,8 +88,14 @@ export function createPipelineRoutes(
 
     void (async () => {
       try {
-        await orchestrator.run({ channelId, topic, skipYoutube });
+        const result = await orchestrator.run({ channelId, topic, skipYoutube });
         lastPipelineErrors.delete(channelId);
+        lastPipelineSuccess.set(channelId, {
+          video_id: result.dbVideoId,
+          title: result.title,
+          preview: skipYoutube,
+          at: new Date().toISOString(),
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`[pipeline] channel=${channelId} failed:`, message);
@@ -128,7 +145,42 @@ export function createPipelineRoutes(
 
   router.get("/pending", async (_req, res) => {
     const pending = await videos.listPending();
-    res.status(200).json({ videos: pending });
+    const enriched = await Promise.all(
+      pending.map(async (video) => ({
+        ...video,
+        preview_only: !video.youtube_video_id,
+        preview_available: video.youtube_video_id
+          ? false
+          : await previewVideoExists(platform.tmpDir, video.id),
+      })),
+    );
+    res.status(200).json({ videos: enriched });
+  });
+
+  router.get("/review/queue", async (_req, res) => {
+    const [pending, activity] = await Promise.all([
+      videos.listPending(),
+      videos.listRecentActivity(),
+    ]);
+
+    const processing = activity.filter((item) => item.status === "processing");
+    const failed = activity.filter((item) => item.status === "failed");
+
+    const ready = await Promise.all(
+      pending.map(async (video) => ({
+        ...video,
+        preview_only: !video.youtube_video_id,
+        preview_available: video.youtube_video_id
+          ? false
+          : await previewVideoExists(platform.tmpDir, video.id),
+      })),
+    );
+
+    res.status(200).json({
+      ready,
+      processing,
+      failed,
+    });
   });
 
   router.get("/videos/activity", async (req, res) => {
@@ -136,7 +188,8 @@ export function createPipelineRoutes(
       typeof req.query.channel_id === "string" ? req.query.channel_id : undefined;
     const activity = await videos.listRecentActivity(channelId);
     const lastError = channelId ? getLastPipelineError(channelId) : null;
-    res.status(200).json({ activity, last_error: lastError });
+    const lastSuccess = channelId ? getLastPipelineSuccess(channelId) : null;
+    res.status(200).json({ activity, last_error: lastError, last_success: lastSuccess });
   });
 
   router.get("/videos/:video_id/preview/thumbnail", async (req, res) => {

@@ -101,7 +101,14 @@ export function GeneratePage() {
 
         if (ready) {
           setError("");
-          setSuccess("Video ready! Open Review to watch and publish.");
+          setSuccess(
+            `Preview ready! Open Review to watch "${ready.title ?? ready.topic ?? "your video"}".`,
+          );
+        } else if (res.last_success?.video_id) {
+          setError("");
+          setSuccess(
+            `Preview ready! Tap Review to watch "${res.last_success.title ?? "your video"}".`,
+          );
         } else if (failed?.quality_notes || res.last_error?.message) {
           setSuccess("");
           setError(
@@ -110,9 +117,12 @@ export function GeneratePage() {
             ),
           );
         } else if (stuck) {
-          setSuccess("Still processing on server — check again in a few minutes.");
+          setSuccess("Still generating on server — check Review in a few minutes.");
         } else {
-          setSuccess("Generation finished. Open Review to check.");
+          setSuccess("");
+          setError(
+            "Generation finished but no video found in Review. Tap Refresh on Review, or try generating again with Preview mode on.",
+          );
         }
       }
     } catch {
