@@ -251,4 +251,23 @@ export const api = {
       "/api/thumbnails/ab-evaluate",
       { method: "POST" },
     ),
+
+  youtubeOAuthConfig: () =>
+    request<{ redirect_uri: string; public_base_url: string }>(
+      "/api/youtube/oauth/config",
+    ),
+
+  youtubeOAuthStart: (clientId: string, clientSecret: string) =>
+    request<{ auth_url: string; state: string }>("/api/youtube/oauth/start", {
+      method: "POST",
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    }),
+
+  youtubeOAuthToken: (state: string) =>
+    request<{ refresh_token: string }>(
+      `/api/youtube/oauth/token?state=${encodeURIComponent(state)}`,
+    ),
 };

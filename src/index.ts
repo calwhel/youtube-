@@ -10,6 +10,10 @@ import {
   createPipelineRoutes,
   getRunningChannelCount,
 } from "./routes/pipeline";
+import {
+  createYoutubeOAuthRoutes,
+  handleYoutubeOAuthCallback,
+} from "./routes/youtube-oauth";
 import { ChannelScheduler } from "./scheduler";
 import { streamTransientAsset } from "./utils/assets";
 
@@ -30,6 +34,10 @@ async function main(): Promise<void> {
     });
   });
 
+  app.get("/api/youtube/oauth/callback", (req, res) => {
+    void handleYoutubeOAuthCallback(req, res, platform);
+  });
+
   app.get("/internal/assets/:token", (req, res) => {
     const asset = streamTransientAsset(req.params.token);
     if (!asset) {
@@ -47,6 +55,7 @@ async function main(): Promise<void> {
 
   const apiRouter = express.Router();
   createAuthRoutes(apiRouter);
+  createYoutubeOAuthRoutes(apiRouter, platform);
   createChannelRoutes(apiRouter, platform);
   createPipelineRoutes(apiRouter, platform, orchestrator);
   app.use("/api", authenticate, apiRouter);
