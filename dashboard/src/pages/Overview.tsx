@@ -16,8 +16,10 @@ import {
   type PendingVideo,
 } from "../lib/api";
 import {
+  DatabaseSetupBanner,
   EmptyState,
   ErrorBanner,
+  isDatabaseError,
   Layout,
   LoadingSpinner,
   PageHeader,
@@ -84,7 +86,11 @@ export function OverviewPage() {
         }
       />
 
-      {error && <ErrorBanner message={error} />}
+      {error && isDatabaseError(error) ? (
+        <DatabaseSetupBanner />
+      ) : (
+        error && <ErrorBanner message={error} />
+      )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

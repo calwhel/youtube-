@@ -3,8 +3,10 @@ import { Copy, Film } from "lucide-react";
 
 import { api, type Channel } from "../lib/api";
 import {
+  DatabaseSetupBanner,
   EmptyState,
   ErrorBanner,
+  isDatabaseError,
   Layout,
   LoadingSpinner,
   PageHeader,
@@ -47,7 +49,11 @@ export function ChannelsPage() {
         description="Your registered YouTube channels and their settings"
       />
 
-      {error && <ErrorBanner message={error} />}
+      {error && isDatabaseError(error) ? (
+        <DatabaseSetupBanner />
+      ) : (
+        error && <ErrorBanner message={error} />
+      )}
 
       {loading ? (
         <LoadingSpinner />
