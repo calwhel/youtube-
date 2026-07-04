@@ -37,7 +37,7 @@ export function buildDescriptionWithChapters(
 export function runQualityGate(
   payload: VideoPayload,
   content: ContentSettings,
-  options: { thumbnailUploaded: boolean },
+  options: { thumbnailUploaded: boolean; previewMode?: boolean },
 ): QualityGateResult {
   const notes: string[] = [];
   let score = 100;
@@ -131,7 +131,7 @@ export function runQualityGate(
     notes.push("Thumbnail A/B variants use identical overlay text");
   }
 
-  if (content.requireThumbnail && !options.thumbnailUploaded) {
+  if (content.requireThumbnail && !options.thumbnailUploaded && !options.previewMode) {
     score -= 20;
     notes.push("Custom thumbnail was not uploaded");
   }
