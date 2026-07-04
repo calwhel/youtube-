@@ -3,6 +3,8 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { ffmpegFontDrawtextArg } from "./ffmpeg-font";
+
 const execFileAsync = promisify(execFile);
 
 const VARIANT_STYLES = {
@@ -49,7 +51,8 @@ async function renderBackground(
     `color=c=${style.background}:s=1280x720:d=1`,
     "-vf",
     [
-      `drawtext=textfile=${textPath.replace(/:/g, "\\:")}`,
+      `drawtext=${ffmpegFontDrawtextArg()}`,
+      `textfile=${textPath.replace(/:/g, "\\:")}`,
       `fontcolor=${style.fontcolor}`,
       "fontsize=78",
       "line_spacing=10",
@@ -99,7 +102,8 @@ async function compositeOnVideoFrame(
     "-vf",
     [
       "boxblur=6:1",
-      `drawtext=textfile=${textPath.replace(/:/g, "\\:")}`,
+      `drawtext=${ffmpegFontDrawtextArg()}`,
+      `textfile=${textPath.replace(/:/g, "\\:")}`,
       `fontcolor=${style.fontcolor}`,
       "fontsize=76",
       "line_spacing=10",

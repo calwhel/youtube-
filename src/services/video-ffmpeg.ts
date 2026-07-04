@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import type { VideoPayload } from "../types/video";
+import { ffmpegFontDrawtextArg } from "../utils/ffmpeg-font";
 
 const execFileAsync = promisify(execFile);
 
@@ -79,7 +80,8 @@ async function renderSceneSegment(
     `color=c=${background}:s=1920x1080:d=${duration}`,
     "-vf",
     [
-      `drawtext=textfile=${textPath.replace(/:/g, "\\:")}`,
+      `drawtext=${ffmpegFontDrawtextArg()}`,
+      `textfile=${textPath.replace(/:/g, "\\:")}`,
       "fontcolor=white",
       "fontsize=44",
       "line_spacing=12",

@@ -17,7 +17,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV TMP_DIR=/tmp
 
-RUN apk add --no-cache ffmpeg wget \
+RUN apk add --no-cache ffmpeg wget fontconfig ttf-dejavu \
+  && fc-cache -f \
   && addgroup -g 1001 -S nodejs \
   && adduser -S pipeline -u 1001 -G nodejs
 
