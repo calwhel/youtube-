@@ -121,6 +121,8 @@ export interface VideoReviewView {
   inauthenticity_risk_score: number | null;
   thumbnail_uploaded: boolean;
   unique_thesis: string | null;
+  preview_only: boolean;
+  preview_video_url: string | null;
 }
 
 export interface CreateChannelPayload {
@@ -178,10 +180,15 @@ export interface VideoActivity {
   quality_notes: string | null;
 }
 
+export interface PipelineConfigResult {
+  skip_youtube_upload_default: boolean;
+}
+
 export interface PipelineStartResult {
   success: boolean;
   status: "started" | "running";
   channel_id: string;
+  skip_youtube?: boolean;
   message?: string;
   error?: string;
 }
@@ -256,6 +263,9 @@ export const api = {
   readiness: () =>
     request<{ channels: YppReport[] }>("/api/monetization/readiness"),
 
+  pipelineConfig: () =>
+    request<PipelineConfigResult>("/api/pipeline/config"),
+
   pipelineStatus: () =>
     request<PipelineStatusResult>("/api/pipeline/status"),
 
@@ -269,10 +279,14 @@ export const api = {
         : "/api/videos/activity",
     ),
 
-  runPipeline: (channelId: string, topic?: string) =>
+  runPipeline: (channelId: string, topic?: string, skipYoutube?: boolean) =>
     request<PipelineStartResult>("/api/run-pipeline", {
       method: "POST",
-      body: JSON.stringify({ channel_id: channelId, topic }),
+      body: JSON.stringify({
+        channel_id: channelId,
+        topic,
+        skip_youtube: skipYoutube,
+      }),
     }),
 
   publish: (videoId: string, data?: { description?: string; tags?: string[]; title?: string }) =>

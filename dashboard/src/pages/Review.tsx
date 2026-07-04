@@ -111,7 +111,9 @@ export function ReviewPage() {
               className="glass glass-hover block rounded-2xl p-5 shadow-card animate-slide-up"
             >
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="badge-warning">Ready</span>
+                <span className="badge-warning">
+                  {video.youtube_video_id ? "Ready" : "Preview"}
+                </span>
                 <span className="badge-neutral">{video.channel_name}</span>
               </div>
               <h3 className="font-display text-lg font-semibold line-clamp-2">

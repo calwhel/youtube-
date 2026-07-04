@@ -99,6 +99,8 @@ export interface VideoReviewView {
   inauthenticity_risk_score: number | null;
   thumbnail_uploaded: boolean;
   unique_thesis: string | null;
+  preview_only: boolean;
+  preview_video_url: string | null;
 }
 
 export interface PendingVideoView {

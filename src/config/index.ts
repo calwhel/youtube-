@@ -38,6 +38,7 @@ export interface PlatformConfig {
     notifyPublish: boolean;
     notifyFailure: boolean;
   };
+  skipYoutubeUpload: boolean;
 }
 
 function requireEnv(name: string): string {
@@ -51,6 +52,14 @@ function requireEnv(name: string): string {
 function optionalEnv(name: string, fallback: string): string {
   const value = process.env[name];
   return value && value.trim() !== "" ? value.trim() : fallback;
+}
+
+function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === "") {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 function parsePositiveInt(value: string, fallback: number): number {
@@ -165,6 +174,7 @@ export function loadConfig(): PlatformConfig {
       notifyPublish: optionalEnv("WEBHOOK_NOTIFY_PUBLISH", "true") === "true",
       notifyFailure: optionalEnv("WEBHOOK_NOTIFY_FAILURE", "true") === "true",
     },
+    skipYoutubeUpload: parseBooleanEnv(process.env.SKIP_YOUTUBE_UPLOAD, true),
   };
 
   return cachedConfig;

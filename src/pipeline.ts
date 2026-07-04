@@ -19,10 +19,15 @@ import { estimatePipelineCostUsd } from "./utils/cost";
 import { canAutoPublish, pickCreatomateTemplate } from "./utils/template-picker";
 import { cleanupTmpDir, ensureTmpDir } from "./utils/tmp";
 import { formatYouTubeAuthError } from "./utils/youtube-auth-error";
+import {
+  savePreviewThumbnail,
+  savePreviewVideo,
+} from "./utils/preview-storage";
 
 export interface RunPipelineOptions {
   channelId: string;
   topic?: string;
+  skipYoutube?: boolean;
 }
 
 export class PipelineOrchestrator {
@@ -92,6 +97,9 @@ export class PipelineOrchestrator {
     const thumbnail = new ThumbnailService(serviceConfig, this.platform);
     const shorts = new ShortsService(serviceConfig);
 
+    const skipYoutube =
+      options.skipYoutube ?? this.platform.skipYoutubeUpload;
+
     const excludedTopics = await this.topicsUsed.listTopicTexts(channel.id);
     const topPerformers = await this.videos.getTopPerformingTopics(channel.id);
 
@@ -143,11 +151,28 @@ export class PipelineOrchestrator {
       );
       console.log(`[pipeline] video rendered: ${renderedVideoUrl}`);
 
-      console.log("[pipeline] uploading to YouTube...");
-      const upload = await youtube.uploadVideo(payload, localVideoPath);
-      console.log(
-        `[pipeline] upload complete (${upload.privacyStatus}): ${upload.videoUrl}`,
-      );
+      let uploadVideoId: string | null = null;
+      let uploadVideoUrl: string | null = null;
+      let uploadPrivacyStatus: "private" | "unlisted" | "public" =
+        serviceConfig.youtube.privacyStatus;
+
+      if (skipYoutube) {
+        console.log("[pipeline] preview mode — skipping YouTube upload");
+        await savePreviewVideo(
+          this.platform.tmpDir,
+          videoRecord.id,
+          localVideoPath,
+        );
+      } else {
+        console.log("[pipeline] uploading to YouTube...");
+        const upload = await youtube.uploadVideo(payload, localVideoPath);
+        uploadVideoId = upload.videoId;
+        uploadVideoUrl = upload.videoUrl;
+        uploadPrivacyStatus = upload.privacyStatus as "private" | "unlisted";
+        console.log(
+          `[pipeline] upload complete (${upload.privacyStatus}): ${upload.videoUrl}`,
+        );
+      }
 
       console.log("[pipeline] generating thumbnail variants...");
       try {
@@ -157,25 +182,41 @@ export class PipelineOrchestrator {
             runDir,
             localVideoPath,
           );
-          await youtube.uploadThumbnail(upload.videoId, variants.variantAPath);
-          thumbnailUploaded = true;
-          console.log("[pipeline] thumbnail variant A uploaded");
+          if (skipYoutube) {
+            await savePreviewThumbnail(
+              this.platform.tmpDir,
+              videoRecord.id,
+              variants.variantAPath,
+            );
+          } else if (uploadVideoId) {
+            await youtube.uploadThumbnail(uploadVideoId, variants.variantAPath);
+            thumbnailUploaded = true;
+            console.log("[pipeline] thumbnail variant A uploaded");
+          }
         } else {
           const thumbnailPath = await thumbnail.generateThumbnail(
             payload,
             runDir,
             localVideoPath,
           );
-          await youtube.uploadThumbnail(upload.videoId, thumbnailPath);
-          thumbnailUploaded = true;
-          console.log("[pipeline] custom thumbnail uploaded");
+          if (skipYoutube) {
+            await savePreviewThumbnail(
+              this.platform.tmpDir,
+              videoRecord.id,
+              thumbnailPath,
+            );
+          } else if (uploadVideoId) {
+            await youtube.uploadThumbnail(uploadVideoId, thumbnailPath);
+            thumbnailUploaded = true;
+            console.log("[pipeline] custom thumbnail uploaded");
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.warn(`[pipeline] thumbnail step failed: ${message}`);
       }
 
-      if (serviceConfig.content.autoGenerateShorts) {
+      if (!skipYoutube && serviceConfig.content.autoGenerateShorts && uploadVideoUrl) {
         try {
           console.log("[pipeline] generating Shorts derivative...");
           const clipPlan = shorts.planClip(payload);
@@ -189,7 +230,7 @@ export class PipelineOrchestrator {
             payload,
             shortPath,
             clipPlan,
-            upload.videoUrl,
+            uploadVideoUrl,
           );
           shortVideoId = shortUpload.videoId;
           shortVideoUrl = shortUpload.videoUrl;
@@ -214,21 +255,29 @@ export class PipelineOrchestrator {
       qualityNotes = allNotes.length > 0 ? allNotes.join("; ") : null;
 
       const passesGates = quality.passed && authenticity.passed;
-      const mayAutoPublish = canAutoPublish(channel) && passesGates;
+      const mayAutoPublish =
+        !skipYoutube && canAutoPublish(channel) && passesGates;
 
       console.log(
-        `[pipeline] quality=${quality.score} authenticity=${authenticity.authenticityScore} risk=${authenticity.inauthenticityRisk} passed=${passesGates} auto=${mayAutoPublish} template=${selectedTemplateId}`,
+        `[pipeline] quality=${quality.score} authenticity=${authenticity.authenticityScore} risk=${authenticity.inauthenticityRisk} passed=${passesGates} auto=${mayAutoPublish} preview=${skipYoutube} template=${selectedTemplateId}`,
       );
 
       const costUsd = estimatePipelineCostUsd();
+      const previewNotes = skipYoutube
+        ? "Preview only — not uploaded to YouTube yet"
+        : null;
+      const combinedNotes = [previewNotes, qualityNotes]
+        .filter(Boolean)
+        .join("; ");
+
       await this.videos.markPrivate(videoRecord.id, {
         topic: payload.topic,
         title: payload.title,
-        youtubeVideoId: upload.videoId,
+        youtubeVideoId: uploadVideoId,
         costUsd,
         thumbnailUploaded,
         qualityScore,
-        qualityNotes,
+        qualityNotes: combinedNotes || qualityNotes,
         thumbnailBText: serviceConfig.content.enableAbThumbnails
           ? payload.thumbnail_b_text
           : null,
@@ -249,19 +298,21 @@ export class PipelineOrchestrator {
       });
       await this.topicsUsed.recordTopic(channel.id, payload.topic);
 
-      if (mayAutoPublish) {
+      if (mayAutoPublish && uploadVideoId) {
         console.log("[pipeline] auto-publishing (quality + authenticity gates passed)...");
         await this.publishFinalizer.finalize({
           dbVideoId: videoRecord.id,
           channelId: channel.id,
-          youtubeVideoId: upload.videoId,
+          youtubeVideoId: uploadVideoId,
           shortYoutubeVideoId: shortVideoId,
         });
         autoPublished = true;
         engagementApplied = true;
         console.log("[pipeline] video published to public");
       } else {
-        const blockReason = !passesGates
+        const blockReason = skipYoutube
+          ? "Preview mode — review in app before uploading to YouTube"
+          : !passesGates
           ? "Quality or authenticity gate failed"
           : !canAutoPublish(channel)
             ? `Review mode: ${channel.manual_publish_count}/${channel.min_manual_publishes_before_auto} manual publishes completed`
@@ -271,19 +322,21 @@ export class PipelineOrchestrator {
           channelName: channel.name,
           title: payload.title,
           topic: payload.topic,
-          videoUrl: upload.videoUrl,
+          videoUrl: uploadVideoUrl ?? undefined,
           qualityScore,
-          qualityNotes,
+          qualityNotes: combinedNotes || qualityNotes,
           details: blockReason,
         });
       }
 
       return {
-        videoId: upload.videoId,
-        videoUrl: upload.videoUrl,
+        videoId: uploadVideoId ?? videoRecord.id,
+        videoUrl:
+          uploadVideoUrl ??
+          `${this.platform.publicBaseUrl}/api/videos/${videoRecord.id}/preview`,
         title: payload.title,
         topic: payload.topic,
-        privacyStatus: autoPublished ? "public" : upload.privacyStatus,
+        privacyStatus: autoPublished ? "public" : uploadPrivacyStatus,
         dbVideoId: videoRecord.id,
         costUsd,
         thumbnailUploaded,
