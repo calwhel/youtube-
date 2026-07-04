@@ -483,7 +483,7 @@ function Field({
           placeholder={placeholder}
           rows={3}
           className="input-field resize-none"
-          required={required ?? true}
+          required={required}
         />
       ) : (
         <input
@@ -492,7 +492,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="input-field"
-          required={required ?? true}
+          required={required}
         />
       )}
     </div>
