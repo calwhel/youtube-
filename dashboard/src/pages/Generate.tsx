@@ -1,12 +1,8 @@
 import { useEffect, useState } from "react";
-import {
-  CheckCircle2,
-  Clapperboard,
-  ExternalLink,
-  Loader2,
-} from "lucide-react";
+import { Link } from "react-router-dom";
+import { Clapperboard, Eye, Loader2 } from "lucide-react";
 
-import { api, type Channel, type PipelineResult } from "../lib/api";
+import { api, type Channel } from "../lib/api";
 import {
   EmptyState,
   ErrorBanner,
@@ -15,33 +11,76 @@ import {
   PageHeader,
   SuccessBanner,
 } from "../components/Layout";
-import { formatCurrency } from "../lib/utils";
 
 export function GeneratePage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [channelId, setChannelId] = useState("");
   const [topic, setTopic] = useState("");
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [backgroundRunning, setBackgroundRunning] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<PipelineResult["result"] | null>(null);
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     void loadChannels();
   }, []);
 
+  useEffect(() => {
+    if (!backgroundRunning || !channelId) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void checkPipelineStatus();
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, [backgroundRunning, channelId]);
+
   async function loadChannels() {
     setLoading(true);
+    setError("");
     try {
-      const res = await api.channels();
-      setChannels(res.channels.filter((c) => c.status === "active"));
-      if (res.channels[0]) {
-        setChannelId(res.channels[0].id);
+      const [channelsRes, statusRes] = await Promise.all([
+        api.channels(),
+        api.pipelineStatus(),
+      ]);
+      const active = channelsRes.channels.filter((c) => c.status === "active");
+      setChannels(active);
+      const id = channelId || active[0]?.id || "";
+      if (!channelId && active[0]) {
+        setChannelId(active[0].id);
+      }
+      if (id && statusRes.running_channel_ids.includes(id)) {
+        setBackgroundRunning(true);
+        setSuccess(
+          "Video is still generating in the background. You can close this app — check Review in a few minutes.",
+        );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load channels");
+      const message = err instanceof Error ? err.message : "Failed to load";
+      setError(
+        message === "Load failed" || message === "Failed to fetch"
+          ? "Connection lost. Pull down to refresh or reopen the app."
+          : message,
+      );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function checkPipelineStatus() {
+    try {
+      const status = await api.pipelineStatus();
+      if (!status.running_channel_ids.includes(channelId)) {
+        setBackgroundRunning(false);
+        setSuccess(
+          "Generation finished (or stopped). Open Review to watch and publish your video.",
+        );
+      }
+    } catch {
+      // Ignore polling errors — server may still be working
     }
   }
 
@@ -49,41 +88,59 @@ export function GeneratePage() {
     event.preventDefault();
     if (!channelId) return;
 
-    setRunning(true);
+    setStarting(true);
     setError("");
-    setResult(null);
+    setSuccess("");
 
     try {
       const res = await api.runPipeline(
         channelId,
         topic.trim() || undefined,
       );
-      if (!res.success || !res.result) {
-        throw new Error(res.error ?? "Pipeline failed");
+      if (!res.success) {
+        throw new Error(res.error ?? "Could not start pipeline");
       }
-      setResult(res.result);
+      setBackgroundRunning(true);
+      setSuccess(
+        res.message ??
+          "Video is generating in the background. Close the app if you want — check Review in 5–10 minutes.",
+      );
     } catch (err) {
       let message = err instanceof Error ? err.message : "Generation failed";
-      if (message.includes("claude-3-5-sonnet") || message.includes("not_found_error")) {
+      if (message.includes("already running")) {
+        setBackgroundRunning(true);
+        setSuccess(
+          "Already creating a video for this channel. Check Review in a few minutes.",
+        );
+        message = "";
+      } else if (message.includes("claude-3-5-sonnet") || message.includes("not_found_error")) {
         message =
-          "AI model outdated. In Railway → Variables, set ANTHROPIC_MODEL to claude-sonnet-4-6 (or remove it), redeploy, then try again.";
+          "AI model outdated. In Railway → Variables, set ANTHROPIC_MODEL to claude-sonnet-4-6, redeploy, then try again.";
+      } else if (message === "Load failed" || message === "Failed to fetch") {
+        message =
+          "Connection dropped — but generation may still be running on the server. Check Review in 5–10 minutes.";
+        setBackgroundRunning(true);
       }
-      setError(message);
+      if (message) {
+        setError(message);
+      }
     } finally {
-      setRunning(false);
+      setStarting(false);
     }
   }
 
   const selected = channels.find((c) => c.id === channelId);
+  const busy = starting || backgroundRunning;
 
   return (
     <Layout>
       <PageHeader
         title="Generate Video"
-        description="Run the full pipeline — research, script, voice, video, upload"
+        description="Runs in the background — safe to leave the app"
       />
 
       {error && <ErrorBanner message={error} />}
+      {success && <SuccessBanner message={success} />}
 
       {loading ? (
         <LoadingSpinner />
@@ -91,7 +148,12 @@ export function GeneratePage() {
         <EmptyState
           icon={Clapperboard}
           title="No active channels"
-          description="Register a channel with npm run setup before generating videos."
+          description="Connect your YouTube channel first."
+          action={
+            <Link to="/setup" className="btn-primary">
+              Connect channel
+            </Link>
+          }
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-5">
@@ -107,7 +169,7 @@ export function GeneratePage() {
                 value={channelId}
                 onChange={(e) => setChannelId(e.target.value)}
                 className="input-field"
-                disabled={running}
+                disabled={busy}
               >
                 {channels.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -128,19 +190,24 @@ export function GeneratePage() {
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="Leave blank for AI topic research"
                 className="input-field"
-                disabled={running}
+                disabled={busy}
               />
             </div>
 
             <button
               type="submit"
-              disabled={running}
+              disabled={busy}
               className="btn-primary w-full"
             >
-              {running ? (
+              {starting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating... (2–10 min)
+                  Starting...
+                </>
+              ) : backgroundRunning ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating in background...
                 </>
               ) : (
                 <>
@@ -150,10 +217,16 @@ export function GeneratePage() {
               )}
             </button>
 
-            {running && (
-              <p className="mt-4 text-center text-xs text-zinc-500 animate-pulse-soft">
-                Researching topic → writing script → voice → video → uploading...
-              </p>
+            {backgroundRunning && (
+              <div className="mt-4 space-y-3 text-center">
+                <p className="text-xs text-zinc-500">
+                  Research → script → voice → video → upload (5–10 min). You can
+                  switch apps or lock your phone.
+                </p>
+                <Link to="/review" className="btn-secondary inline-flex w-full justify-center">
+                  <Eye className="h-4 w-4" /> Open Review queue
+                </Link>
+              </div>
             )}
           </form>
 
@@ -189,60 +262,6 @@ export function GeneratePage() {
                       {selected.manual_publish_count} /{" "}
                       {selected.min_manual_publishes_before_auto}
                     </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {result && (
-              <div className="glass rounded-2xl p-6 shadow-card animate-slide-up">
-                <SuccessBanner message="Video generated successfully!" />
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-display text-lg font-semibold">
-                      {result.title}
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-400">{result.topic}</p>
-                    <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                      <span className="rounded-lg bg-surface-overlay px-3 py-1.5 text-zinc-300">
-                        Cost {formatCurrency(result.costUsd)}
-                      </span>
-                      {result.qualityScore !== null && (
-                        <span className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-emerald-400">
-                          Quality {Math.round(result.qualityScore)}
-                        </span>
-                      )}
-                      <span
-                        className={
-                          result.autoPublished
-                            ? "badge-success"
-                            : "badge-warning"
-                        }
-                      >
-                        {result.autoPublished ? "Auto-published" : "Needs review"}
-                      </span>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <a
-                        href={result.videoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-secondary"
-                      >
-                        <ExternalLink className="h-4 w-4" /> View on YouTube
-                      </a>
-                      {result.shortVideoUrl && (
-                        <a
-                          href={result.shortVideoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn-secondary"
-                        >
-                          <ExternalLink className="h-4 w-4" /> View Short
-                        </a>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>

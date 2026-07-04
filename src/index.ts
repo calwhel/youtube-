@@ -9,6 +9,7 @@ import { createChannelRoutes } from "./routes/channels";
 import {
   createPipelineRoutes,
   getRunningChannelCount,
+  getRunningChannelIds,
 } from "./routes/pipeline";
 import {
   createYoutubeOAuthRoutes,
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
     res.status(200).json({
       status: "ok",
       runningPipelines: getRunningChannelCount(),
+      runningChannelIds: getRunningChannelIds(),
       timestamp: new Date().toISOString(),
     });
   });
