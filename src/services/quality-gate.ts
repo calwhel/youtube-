@@ -2,11 +2,11 @@ import type { VideoPayload, QualityGateResult } from "../types/video";
 import type { ContentSettings } from "../types/channel";
 import { appendSourcesToDescription } from "./authenticity-gate";
 
-const HOOK_PATTERNS = [
-  /\b(why|how|what if|never|secret|hidden|truth|shocking|nobody)\b/i,
-  /\b\d+\b/,
-  /\?$/,
-];
+const THUMBNAIL_POWER_WORDS =
+  /\b(exposed|truth|wrong|secret|hidden|insane|finally|shocking|never|why|how|stop|don't|won't|revealed|debunked|real reason)\b/i;
+
+const TITLE_POWER_WORDS =
+  /\b(why|how|secret|hidden|truth|wrong|never|everyone|actually|real|exposed|shocking|debunked)\b/i;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -48,12 +48,31 @@ export function runQualityGate(
     notes.push(`Title length ${titleLength} chars (target 30-70 for CTR)`);
   }
 
-  const hasHookPattern = HOOK_PATTERNS.some((pattern) =>
-    pattern.test(payload.title),
-  );
+  const hasHookPattern =
+    TITLE_POWER_WORDS.test(payload.title) ||
+    /\b\d+\b/.test(payload.title) ||
+    /\?/.test(payload.title) ||
+    /!/.test(payload.title);
   if (!hasHookPattern) {
+    score -= 15;
+    notes.push("Title lacks clickbait hook (add why/how/number/shocking angle)");
+  }
+
+  const thumbWords = payload.thumbnail_text.trim().split(/\s+/).length;
+  if (thumbWords > 4) {
     score -= 10;
-    notes.push("Title lacks a strong curiosity hook pattern");
+    notes.push("Thumbnail text too long (max 4 words for mobile CTR)");
+  } else if (!THUMBNAIL_POWER_WORDS.test(payload.thumbnail_text)) {
+    score -= 8;
+    notes.push("Thumbnail text missing power words (EXPOSED, TRUTH, SECRET, etc.)");
+  }
+
+  if (
+    payload.thumbnail_text.trim().toUpperCase() ===
+    payload.title.trim().toUpperCase()
+  ) {
+    score -= 10;
+    notes.push("Thumbnail text duplicates title — use a complementary hook");
   }
 
   const firstSceneWords = countWords(payload.scenes[0]?.voiceover_text ?? "");
@@ -101,6 +120,15 @@ export function runQualityGate(
   if (payload.thumbnail_text.trim().split(/\s+/).length > 6) {
     score -= 5;
     notes.push("Thumbnail text exceeds 6 words");
+  }
+
+  if (
+    content.enableAbThumbnails &&
+    payload.thumbnail_b_text.trim().toUpperCase() ===
+      payload.thumbnail_text.trim().toUpperCase()
+  ) {
+    score -= 5;
+    notes.push("Thumbnail A/B variants use identical overlay text");
   }
 
   if (content.requireThumbnail && !options.thumbnailUploaded) {

@@ -59,17 +59,17 @@ interface VideoPayload {
   }>;
 }
 
-Retention and packaging rules:
+Retention and packaging rules (MAXIMIZE CLICKS — thumbnail and title are priority #1):
 - topic: must match the selected episode topic above (one concise sentence)
-- title: 40-65 characters, high CTR, matches title style "${config.content.titleStyle}" — use curiosity gap, specificity, or a bold claim (no clickbait lies)
-- description: 2-4 SEO paragraphs PLUS a subscribe CTA; write for humans first
-- tags: 10-15 high-intent tags mixing broad and long-tail
-- thumbnail_prompt: bold, high-contrast, single focal subject, readable at mobile size, no clutter
-- thumbnail_text: max 4 words, ALL CAPS friendly, complements (does not duplicate) the title
-- thumbnail_b_prompt: alternate thumbnail image prompt — different angle/composition from variant A, same topic
-- thumbnail_b_text: alternate thumbnail overlay text — different hook angle from thumbnail_text (max 4 words)
-- short_title: punchy Shorts title under 70 chars ending with #Shorts — optimized for the hook clip
-- pinned_comment: engaging question to pin on the video (1-2 sentences, drives comments)
+- title: 45-65 characters, HIGH CTR clickbait-style — curiosity gap, bold claim, numbers, or "why X is wrong" — must still be deliverable in the video (no outright lies)
+- description: 2-4 SEO paragraphs PLUS a subscribe CTA; front-load the hook in line 1; include 3-5 searchable keywords naturally
+- tags: 12-15 tags mixing viral broad terms + long-tail search phrases
+- thumbnail_prompt: extreme close-up face or object, high saturation, dramatic lighting, single focal point, mobile-readable, MrBeast/viral documentary style
+- thumbnail_text: 2-4 words MAX, ALL CAPS, power words (EXPOSED, TRUTH, WRONG, SECRET, INSANE, HIDDEN, FINALLY) — must create curiosity WITHOUT repeating the title verbatim
+- thumbnail_b_prompt: alternate composition — different color mood (e.g. red vs yellow accent), zoomed subject, arrow or shock visual implied in prompt
+- thumbnail_b_text: different hook angle from variant A — test fear vs curiosity vs controversy (2-4 words ALL CAPS)
+- short_title: punchy hook under 60 chars + #Shorts — open loop in first 5 words
+- pinned_comment: controversial or debate-sparking question to drive comments (essential for algorithm)
 
 Authenticity rules (CRITICAL for YouTube monetization — avoid inauthentic/mass-produced content flags):
 - unique_thesis: one sentence stating the video's original argument — what conventional wisdom gets wrong, or your channel's fresh take

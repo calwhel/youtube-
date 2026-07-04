@@ -145,9 +145,11 @@ export class TopicResearchService {
     const keywords = nicheKeywords(this.config.nichePrompt);
     const queries = [
       this.config.nichePrompt.slice(0, 80),
+      ...keywords.map((keyword) => `${keyword} exposed`),
+      ...keywords.map((keyword) => `why ${keyword} is wrong`),
+      ...keywords.map((keyword) => `${keyword} truth`),
       ...keywords.map((keyword) => `${keyword} explained`),
-      ...keywords.map((keyword) => `why ${keyword}`),
-      ...keywords.map((keyword) => `${keyword} mystery`),
+      ...keywords.map((keyword) => `what they won't tell you ${keyword}`),
     ];
 
     const suggestionSets = await Promise.all(
@@ -213,10 +215,11 @@ Return ONLY a JSON array of 5 objects with this shape:
 ]
 
 Score higher when the topic has:
-- Strong curiosity gap / open loop potential
-- Clear search demand
-- Broad appeal within the niche
+- Strong curiosity gap / open loop potential (clickbait-friendly but substantively deliverable)
+- High search volume signals from autocomplete
+- Broad appeal within the niche — mass-market hooks beat narrow academic angles
 - Visual storytelling potential for faceless video
+- Controversy, myth-busting, or "everyone gets this wrong" angles
 - Room for 8-12 minute deep-dive structure${exclusionBlock}${performerBlock}${suggestionsBlock}`;
 
     return withRetry(

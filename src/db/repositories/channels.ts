@@ -184,7 +184,7 @@ export class ChannelRepository {
         input.status ?? "paused",
         input.target_duration_minutes ?? 10,
         input.audience_level ?? "general",
-        input.title_style ?? "curiosity",
+        input.title_style ?? "controversy",
         input.auto_publish ?? false,
         input.youtube_category_id ?? "28",
         input.creatomate_thumbnail_template_id ?? null,

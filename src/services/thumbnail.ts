@@ -4,7 +4,7 @@ import path from "node:path";
 import type { PlatformConfig } from "../config";
 import type { ServiceConfig } from "../config/channel-config";
 import type { ThumbnailVariants, VideoPayload } from "../types/video";
-import { extractVideoFrame } from "../utils/ffmpeg";
+import { renderClickbaitThumbnail } from "../utils/thumbnail-ffmpeg";
 import { sleep, withRetry } from "../utils/tmp";
 
 interface CreatomateRenderResponse {
@@ -85,13 +85,22 @@ export class ThumbnailService {
     }
 
     if (!localVideoPath) {
-      throw new Error(
-        `No thumbnail template configured and no video for variant ${variant}`,
+      await renderClickbaitThumbnail(
+        thumbnailText,
+        outputPath,
+        variant,
+        path.dirname(outputPath),
       );
+      return;
     }
 
-    const seekSeconds = variant === "B" ? 8 : 3;
-    await extractVideoFrame(localVideoPath, outputPath, seekSeconds);
+    await renderClickbaitThumbnail(
+      thumbnailText,
+      outputPath,
+      variant,
+      path.dirname(outputPath),
+      localVideoPath,
+    );
   }
 
   private async renderCreatomateThumbnail(
