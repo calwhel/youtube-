@@ -4,8 +4,8 @@
   "description": "Multi-tenant automated YouTube video generation and upload pipeline for Railway",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && mkdir -p dist/db && cp src/db/schema.sql dist/db/schema.sql && cp src/db/migrations.sql dist/db/migrations.sql && vite build --config dashboard/vite.config.ts",
-    "build:server": "tsc && mkdir -p dist/db && cp src/db/schema.sql dist/db/schema.sql && cp src/db/migrations.sql dist/db/migrations.sql",
+    "build": "tsc && mkdir -p dist/db dist/fonts && cp src/db/schema.sql dist/db/schema.sql && cp src/db/migrations.sql dist/db/migrations.sql && cp assets/fonts/DejaVuSans-Bold.ttf dist/fonts/DejaVuSans-Bold.ttf && vite build --config dashboard/vite.config.ts",
+    "build:server": "tsc && mkdir -p dist/db dist/fonts && cp src/db/schema.sql dist/db/schema.sql && cp src/db/migrations.sql dist/db/migrations.sql && cp assets/fonts/DejaVuSans-Bold.ttf dist/fonts/DejaVuSans-Bold.ttf",
     "build:dashboard": "vite build --config dashboard/vite.config.ts",
     "dev:dashboard": "vite --config dashboard/vite.config.ts",
     "start": "node dist/index.js",
