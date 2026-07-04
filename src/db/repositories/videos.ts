@@ -237,10 +237,16 @@ export class VideoRepository {
     };
   }
 
-  async markFailed(videoId: string): Promise<void> {
+  async markFailed(videoId: string, errorMessage?: string): Promise<void> {
     await query(
-      `UPDATE videos SET status = 'failed' WHERE id = $1`,
-      [videoId],
+      `
+      UPDATE videos
+      SET
+        status = 'failed',
+        quality_notes = COALESCE($2, quality_notes)
+      WHERE id = $1
+      `,
+      [videoId, errorMessage ?? null],
     );
   }
 
@@ -370,6 +376,68 @@ export class VideoRepository {
       thumbnail_uploaded: row.thumbnail_uploaded,
       quality_score: row.quality_score ? Number(row.quality_score) : null,
       short_youtube_video_id: row.short_youtube_video_id,
+    }));
+  }
+
+  async listRecentActivity(channelId?: string): Promise<
+    Array<{
+      id: string;
+      channel_id: string;
+      channel_name: string;
+      topic: string | null;
+      title: string | null;
+      status: VideoStatus;
+      created_at: string;
+      quality_notes: string | null;
+    }>
+  > {
+    const params: unknown[] = [];
+    let channelFilter = "";
+    if (channelId) {
+      channelFilter = "AND v.channel_id = $1";
+      params.push(channelId);
+    }
+
+    const rows = await query<{
+      id: string;
+      channel_id: string;
+      channel_name: string;
+      topic: string | null;
+      title: string | null;
+      status: VideoStatus;
+      created_at: Date;
+      quality_notes: string | null;
+    }>(
+      `
+      SELECT
+        v.id,
+        v.channel_id,
+        c.name AS channel_name,
+        v.topic,
+        v.title,
+        v.status,
+        v.created_at,
+        v.quality_notes
+      FROM videos v
+      INNER JOIN channels c ON c.id = v.channel_id
+      WHERE v.video_type = 'long'
+        AND v.status IN ('processing', 'private', 'failed')
+        ${channelFilter}
+      ORDER BY v.created_at DESC
+      LIMIT 10
+      `,
+      params,
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      channel_id: row.channel_id,
+      channel_name: row.channel_name,
+      topic: row.topic,
+      title: row.title,
+      status: row.status,
+      created_at: row.created_at.toISOString(),
+      quality_notes: row.quality_notes,
     }));
   }
 

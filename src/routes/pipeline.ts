@@ -11,6 +11,16 @@ import { YouTubeService } from "../services/youtube";
 import { YppReadinessService } from "../services/ypp-readiness";
 
 const runningChannels = new Set<string>();
+const lastPipelineErrors = new Map<
+  string,
+  { message: string; at: string }
+>();
+
+export function getLastPipelineError(
+  channelId: string,
+): { message: string; at: string } | null {
+  return lastPipelineErrors.get(channelId) ?? null;
+}
 
 export function isChannelPipelineRunning(channelId: string): boolean {
   return runningChannels.has(channelId);
@@ -59,9 +69,14 @@ export function createPipelineRoutes(
     void (async () => {
       try {
         await orchestrator.run({ channelId, topic });
+        lastPipelineErrors.delete(channelId);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`[pipeline] channel=${channelId} failed:`, message);
+        lastPipelineErrors.set(channelId, {
+          message,
+          at: new Date().toISOString(),
+        });
       } finally {
         runningChannels.delete(channelId);
       }
@@ -97,6 +112,14 @@ export function createPipelineRoutes(
   router.get("/pending", async (_req, res) => {
     const pending = await videos.listPending();
     res.status(200).json({ videos: pending });
+  });
+
+  router.get("/videos/activity", async (req, res) => {
+    const channelId =
+      typeof req.query.channel_id === "string" ? req.query.channel_id : undefined;
+    const activity = await videos.listRecentActivity(channelId);
+    const lastError = channelId ? getLastPipelineError(channelId) : null;
+    res.status(200).json({ activity, last_error: lastError });
   });
 
   router.get("/videos/:video_id", async (req, res) => {

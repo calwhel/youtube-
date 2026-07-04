@@ -162,6 +162,17 @@ export interface CostRow {
   video_count: number;
 }
 
+export interface VideoActivity {
+  id: string;
+  channel_id: string;
+  channel_name: string;
+  topic: string | null;
+  title: string | null;
+  status: "processing" | "private" | "published" | "failed";
+  created_at: string;
+  quality_notes: string | null;
+}
+
 export interface PipelineStartResult {
   success: boolean;
   status: "started" | "running";
@@ -229,6 +240,16 @@ export const api = {
 
   pipelineStatus: () =>
     request<PipelineStatusResult>("/api/pipeline/status"),
+
+  videoActivity: (channelId?: string) =>
+    request<{
+      activity: VideoActivity[];
+      last_error: { message: string; at: string } | null;
+    }>(
+      channelId
+        ? `/api/videos/activity?channel_id=${encodeURIComponent(channelId)}`
+        : "/api/videos/activity",
+    ),
 
   runPipeline: (channelId: string, topic?: string) =>
     request<PipelineStartResult>("/api/run-pipeline", {

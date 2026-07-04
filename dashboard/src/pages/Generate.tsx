@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Clapperboard, Eye, Loader2 } from "lucide-react";
 
-import { api, type Channel } from "../lib/api";
+import { api, type Channel, type VideoActivity } from "../lib/api";
 import {
   EmptyState,
   ErrorBanner,
@@ -19,6 +19,7 @@ export function GeneratePage() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [backgroundRunning, setBackgroundRunning] = useState(false);
+  const [activity, setActivity] = useState<VideoActivity[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -38,6 +39,18 @@ export function GeneratePage() {
     return () => window.clearInterval(interval);
   }, [backgroundRunning, channelId]);
 
+  async function refreshActivity(id: string) {
+    try {
+      const res = await api.videoActivity(id);
+      setActivity(res.activity);
+      if (res.last_error) {
+        setError(res.last_error.message);
+      }
+    } catch {
+      // non-fatal
+    }
+  }
+
   async function loadChannels() {
     setLoading(true);
     setError("");
@@ -51,6 +64,9 @@ export function GeneratePage() {
       const id = channelId || active[0]?.id || "";
       if (!channelId && active[0]) {
         setChannelId(active[0].id);
+      }
+      if (id) {
+        await refreshActivity(id);
       }
       if (id && statusRes.running_channel_ids.includes(id)) {
         setBackgroundRunning(true);
@@ -75,9 +91,24 @@ export function GeneratePage() {
       const status = await api.pipelineStatus();
       if (!status.running_channel_ids.includes(channelId)) {
         setBackgroundRunning(false);
-        setSuccess(
-          "Generation finished (or stopped). Open Review to watch and publish your video.",
-        );
+        const res = await api.videoActivity(channelId);
+        setActivity(res.activity);
+
+        const ready = res.activity.find((item) => item.status === "private");
+        const failed = res.activity.find((item) => item.status === "failed");
+        const stuck = res.activity.find((item) => item.status === "processing");
+
+        if (ready) {
+          setError("");
+          setSuccess("Video ready! Open Review to watch and publish.");
+        } else if (failed?.quality_notes || res.last_error?.message) {
+          setSuccess("");
+          setError(failed?.quality_notes ?? res.last_error?.message ?? "Generation failed.");
+        } else if (stuck) {
+          setSuccess("Still processing on server — check again in a few minutes.");
+        } else {
+          setSuccess("Generation finished. Open Review to check.");
+        }
       }
     } catch {
       // Ignore polling errors — server may still be working
@@ -226,6 +257,13 @@ export function GeneratePage() {
                 <Link to="/review" className="btn-secondary inline-flex w-full justify-center">
                   <Eye className="h-4 w-4" /> Open Review queue
                 </Link>
+              </div>
+            )}
+
+            {!backgroundRunning && activity.some((a) => a.status === "failed") && (
+              <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-left text-xs text-red-200">
+                <p className="font-medium">Last attempt failed</p>
+                <p className="mt-1">{activity.find((a) => a.status === "failed")?.quality_notes ?? "Unknown error"}</p>
               </div>
             )}
           </form>
