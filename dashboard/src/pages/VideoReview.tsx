@@ -108,7 +108,16 @@ export function VideoReviewPage() {
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3 space-y-4">
           <div className="glass overflow-hidden rounded-2xl shadow-card">
-            {video.youtube_embed_url ? (
+            {video.preview_video_url ? (
+              <div className="relative aspect-video w-full bg-black">
+                <video
+                  controls
+                  playsInline
+                  className="absolute inset-0 h-full w-full"
+                  src={video.preview_video_url}
+                />
+              </div>
+            ) : video.youtube_embed_url ? (
               <div className="relative aspect-video w-full bg-black">
                 <iframe
                   title="Video preview"
@@ -130,6 +139,9 @@ export function VideoReviewPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs">
+            {video.preview_only && (
+              <span className="badge-warning">Preview only — not on YouTube</span>
+            )}
             {video.quality_score !== null && (
               <span className="badge-success">Quality {Math.round(video.quality_score)}</span>
             )}
@@ -149,9 +161,13 @@ export function VideoReviewPage() {
 
         <div className="lg:col-span-2 space-y-4">
           <div className="glass rounded-2xl p-5 shadow-card space-y-4">
-            <h3 className="font-display font-semibold">Publish settings</h3>
+            <h3 className="font-display font-semibold">
+              {video.preview_only ? "Preview details" : "Publish settings"}
+            </h3>
             <p className="text-xs text-zinc-500">
-              Edit before publishing. This updates YouTube title, description, hashtags, then goes public with pinned comment + playlist.
+              {video.preview_only
+                ? "Check title, description, and tags. When quality is good, go to Create, uncheck preview mode, and generate again to upload to YouTube."
+                : "Edit before publishing. This updates YouTube title, description, hashtags, then goes public with pinned comment + playlist."}
             </p>
 
             <div>
@@ -193,13 +209,15 @@ export function VideoReviewPage() {
 
             <button
               onClick={() => void handlePublish()}
-              disabled={publishing || video.status === "published"}
+              disabled={publishing || video.status === "published" || video.preview_only}
               className="btn-primary w-full"
             >
               {publishing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" /> Publishing...
                 </>
+              ) : video.preview_only ? (
+                "Upload to YouTube from Create (disable preview mode)"
               ) : video.status === "published" ? (
                 "Already published"
               ) : (

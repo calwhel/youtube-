@@ -35,7 +35,7 @@ export class VideoRepository {
     data: {
       topic: string;
       title: string;
-      youtubeVideoId: string;
+      youtubeVideoId: string | null;
       costUsd: number;
       thumbnailUploaded: boolean;
       qualityScore: number | null;
@@ -234,6 +234,43 @@ export class VideoRepository {
         : null,
       thumbnail_uploaded: row.thumbnail_uploaded,
       unique_thesis: row.unique_thesis,
+      preview_only: !ytId,
+      preview_video_url: null,
+    };
+  }
+
+  async findReviewByIdEnriched(
+    videoId: string,
+    tmpDir: string,
+  ): Promise<VideoReviewView | null> {
+    const review = await this.findReviewById(videoId);
+    if (!review) {
+      return null;
+    }
+
+    if (review.youtube_video_id) {
+      return {
+        ...review,
+        preview_only: false,
+        preview_video_url: null,
+      };
+    }
+
+    const { previewVideoExists, previewThumbnailExists } = await import(
+      "../../utils/preview-storage"
+    );
+    const hasVideo = await previewVideoExists(tmpDir, videoId);
+    const hasThumb = await previewThumbnailExists(tmpDir, videoId);
+
+    return {
+      ...review,
+      preview_only: true,
+      preview_video_url: hasVideo ? `/api/videos/${videoId}/preview` : null,
+      thumbnail_url: hasThumb
+        ? `/api/videos/${videoId}/preview/thumbnail`
+        : null,
+      youtube_embed_url: null,
+      youtube_watch_url: null,
     };
   }
 

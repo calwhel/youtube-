@@ -1,4 +1,5 @@
 import type { Request, Response, Router } from "express";
+import { createReadStream, existsSync } from "node:fs";
 
 import type { PlatformConfig } from "../config";
 import { ChannelRepository } from "../db/repositories/channels";
@@ -9,6 +10,10 @@ import { PublishFinalizer } from "../services/publish-finalizer";
 import { ThumbnailAbService } from "../services/thumbnail-ab";
 import { YouTubeService } from "../services/youtube";
 import { YppReadinessService } from "../services/ypp-readiness";
+import {
+  getPreviewThumbnailPath,
+  getPreviewVideoPath,
+} from "../utils/preview-storage";
 
 const runningChannels = new Set<string>();
 const lastPipelineErrors = new Map<
@@ -63,12 +68,16 @@ export function createPipelineRoutes(
 
     const topic =
       typeof req.body?.topic === "string" ? req.body.topic : undefined;
+    const skipYoutube =
+      typeof req.body?.skip_youtube === "boolean"
+        ? req.body.skip_youtube
+        : platform.skipYoutubeUpload;
 
     runningChannels.add(channelId);
 
     void (async () => {
       try {
-        await orchestrator.run({ channelId, topic });
+        await orchestrator.run({ channelId, topic, skipYoutube });
         lastPipelineErrors.delete(channelId);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -86,10 +95,18 @@ export function createPipelineRoutes(
       success: true,
       status: "started",
       channel_id: channelId,
-      message:
-        "Video is generating in the background. Check the Review tab in 5–10 minutes.",
+      skip_youtube: skipYoutube,
+      message: skipYoutube
+        ? "Video is generating for in-app preview (no YouTube upload). Check Review in 5–10 minutes."
+        : "Video is generating in the background. Check the Review tab in 5–10 minutes.",
     });
   };
+
+  router.get("/pipeline/config", (_req, res) => {
+    res.status(200).json({
+      skip_youtube_upload_default: platform.skipYoutubeUpload,
+    });
+  });
 
   router.get("/pipeline/status", (_req, res) => {
     res.status(200).json({
@@ -122,8 +139,38 @@ export function createPipelineRoutes(
     res.status(200).json({ activity, last_error: lastError });
   });
 
+  router.get("/videos/:video_id/preview/thumbnail", async (req, res) => {
+    const thumbnailPath = getPreviewThumbnailPath(
+      platform.tmpDir,
+      req.params.video_id,
+    );
+    if (!existsSync(thumbnailPath)) {
+      res.status(404).json({ error: "Preview thumbnail not found" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    createReadStream(thumbnailPath).pipe(res);
+  });
+
+  router.get("/videos/:video_id/preview", async (req, res) => {
+    const videoPath = getPreviewVideoPath(platform.tmpDir, req.params.video_id);
+    if (!existsSync(videoPath)) {
+      res.status(404).json({ error: "Preview video not found" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    createReadStream(videoPath).pipe(res);
+  });
+
   router.get("/videos/:video_id", async (req, res) => {
-    const review = await videos.findReviewById(req.params.video_id);
+    const review = await videos.findReviewByIdEnriched(
+      req.params.video_id,
+      platform.tmpDir,
+    );
     if (!review) {
       res.status(404).json({ error: "Video not found" });
       return;
@@ -168,7 +215,10 @@ export function createPipelineRoutes(
       }
     }
 
-    const review = await videos.findReviewById(req.params.video_id);
+    const review = await videos.findReviewByIdEnriched(
+      req.params.video_id,
+      platform.tmpDir,
+    );
     res.status(200).json({ video: review });
   });
 
@@ -179,9 +229,17 @@ export function createPipelineRoutes(
       return;
     }
 
-    if (video.status !== "private" || !video.youtube_video_id) {
+    if (video.status !== "private") {
       res.status(400).json({
-        error: "Only private uploaded videos can be published",
+        error: "Only private videos awaiting review can be published",
+      });
+      return;
+    }
+
+    if (!video.youtube_video_id) {
+      res.status(400).json({
+        error:
+          "This is a preview-only video. Turn off preview mode on Create to upload to YouTube, or reconnect YouTube and regenerate.",
       });
       return;
     }

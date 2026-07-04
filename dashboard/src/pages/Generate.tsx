@@ -23,9 +23,13 @@ export function GeneratePage() {
   const [activity, setActivity] = useState<VideoActivity[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [previewOnly, setPreviewOnly] = useState(true);
 
   useEffect(() => {
     void loadChannels();
+    void api.pipelineConfig().then((res) => {
+      setPreviewOnly(res.skip_youtube_upload_default);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -128,6 +132,7 @@ export function GeneratePage() {
       const res = await api.runPipeline(
         channelId,
         topic.trim() || undefined,
+        previewOnly,
       );
       if (!res.success) {
         throw new Error(res.error ?? "Could not start pipeline");
@@ -135,7 +140,9 @@ export function GeneratePage() {
       setBackgroundRunning(true);
       setSuccess(
         res.message ??
-          "Video is generating in the background. Close the app if you want — check Review in 5–10 minutes.",
+          (previewOnly
+            ? "Generating preview in the background — no YouTube upload. Check Review in 5–10 minutes."
+            : "Video is generating in the background. Close the app if you want — check Review in 5–10 minutes."),
       );
     } catch (err) {
       let message = err instanceof Error ? err.message : "Generation failed";
@@ -166,7 +173,11 @@ export function GeneratePage() {
     <Layout>
       <PageHeader
         title="Generate Video"
-        description="Runs in the background — safe to leave the app"
+        description={
+          previewOnly
+            ? "Preview mode — watch quality in Review before touching YouTube"
+            : "Runs in the background — safe to leave the app"
+        }
       />
 
       {error && <ErrorBanner message={error} />}
@@ -223,6 +234,26 @@ export function GeneratePage() {
                 disabled={busy}
               />
             </div>
+
+            <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-xl border border-surface-border/60 bg-surface-overlay/40 p-4">
+              <input
+                type="checkbox"
+                checked={previewOnly}
+                onChange={(e) => setPreviewOnly(e.target.checked)}
+                disabled={busy}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-medium text-zinc-200">
+                  Preview only (skip YouTube upload)
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-zinc-500">
+                  Render the full video and watch it in Review — no Google token
+                  needed. Uncheck when you&apos;re happy with quality and ready
+                  to upload.
+                </span>
+              </span>
+            </label>
 
             <button
               type="submit"
