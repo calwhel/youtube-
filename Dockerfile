@@ -7,6 +7,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY assets ./assets
 COPY dashboard ./dashboard
 RUN npm run build && npm prune --omit=dev
 

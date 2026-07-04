@@ -2,11 +2,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 const FONT_CANDIDATES = [
+  path.join(__dirname, "..", "fonts", "DejaVuSans-Bold.ttf"),
+  path.join(process.cwd(), "dist", "fonts", "DejaVuSans-Bold.ttf"),
   "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+  "/usr/share/fonts/dejavu/DejaVuSans.ttf",
   "/usr/share/fonts/ttf-dejavu/DejaVuSans-Bold.ttf",
   "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-  path.join(__dirname, "fonts", "DejaVuSans-Bold.ttf"),
-  path.join(__dirname, "..", "assets", "fonts", "DejaVuSans-Bold.ttf"),
 ];
 
 export function getFfmpegFontFile(): string {
@@ -17,7 +18,7 @@ export function getFfmpegFontFile(): string {
   }
 
   throw new Error(
-    "No font found for ffmpeg drawtext. Rebuild the Docker image (needs ttf-dejavu).",
+    "No font found for ffmpeg drawtext. Rebuild the app (bundled font missing).",
   );
 }
 
