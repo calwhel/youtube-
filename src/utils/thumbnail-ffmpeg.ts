@@ -114,7 +114,7 @@ async function compositeOnVideoFrame(
       "box=1",
       `boxcolor=${style.accent}@0.9`,
       "boxborderw=24",
-    ].join(":"),
+    ].join(","),
     "-frames:v",
     "1",
     "-q:v",

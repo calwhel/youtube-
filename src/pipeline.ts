@@ -166,6 +166,9 @@ export class PipelineOrchestrator {
           videoRecord.id,
           localVideoPath,
         );
+        console.log(
+          `[pipeline] preview saved: /tmp/previews/${videoRecord.id}.mp4`,
+        );
       } else {
         console.log("[pipeline] uploading to YouTube...");
         const upload = await youtube.uploadVideo(payload, localVideoPath);
@@ -251,6 +254,7 @@ export class PipelineOrchestrator {
 
       const quality = runQualityGate(payload, serviceConfig.content, {
         thumbnailUploaded,
+        previewMode: skipYoutube,
       });
       qualityScore = quality.score;
 
