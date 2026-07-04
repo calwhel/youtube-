@@ -63,7 +63,12 @@ export function GeneratePage() {
       }
       setResult(res.result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generation failed");
+      let message = err instanceof Error ? err.message : "Generation failed";
+      if (message.includes("claude-3-5-sonnet") || message.includes("not_found_error")) {
+        message =
+          "AI model outdated. In Railway → Variables, set ANTHROPIC_MODEL to claude-sonnet-4-6 (or remove it), redeploy, then try again.";
+      }
+      setError(message);
     } finally {
       setRunning(false);
     }

@@ -117,10 +117,7 @@ export function loadConfig(): PlatformConfig {
     videoRenderer,
     anthropic: {
       apiKey: requireEnv("ANTHROPIC_API_KEY"),
-      model: optionalEnv(
-        "ANTHROPIC_MODEL",
-        "claude-3-5-sonnet-20241022",
-      ),
+      model: optionalEnv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
     },
     elevenlabs: {
       apiKey: requireEnv("ELEVENLABS_API_KEY"),
