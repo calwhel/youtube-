@@ -179,7 +179,7 @@ export function SetupPage() {
         status: "active",
         upload_frequency: "0 14 * * *",
       });
-      setSuccess(`Channel "${res.channel.name}" connected!`);
+      setSuccess(`Channel "${res.channel.name}" saved! Open Create to generate your first video.`);
       setForm(emptyForm);
       setYoutubeConnected(false);
       await load();
@@ -362,7 +362,7 @@ export function SetupPage() {
 
               {youtubeConnected && (
                 <p className="flex items-center gap-2 text-sm text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" /> YouTube authorized
+                  <CheckCircle2 className="h-4 w-4" /> YouTube authorized — now tap Save channel below
                 </p>
               )}
             </div>
