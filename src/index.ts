@@ -15,6 +15,7 @@ import {
   handleYoutubeOAuthCallback,
 } from "./routes/youtube-oauth";
 import { ChannelScheduler } from "./scheduler";
+import { bootstrapSchema, waitForDatabase } from "./db/pool";
 import { streamTransientAsset } from "./utils/assets";
 
 async function main(): Promise<void> {
@@ -63,6 +64,9 @@ async function main(): Promise<void> {
   app.get(/^\/(?!api|internal|health).*/, (_req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
   });
+
+  await waitForDatabase();
+  await bootstrapSchema();
 
   app.listen(platform.port, () => {
     console.log(

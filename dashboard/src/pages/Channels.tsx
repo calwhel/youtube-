@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Copy, Film } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Copy, Film, Link2, RefreshCw } from "lucide-react";
 
 import { api, type Channel } from "../lib/api";
 import {
@@ -47,6 +48,11 @@ export function ChannelsPage() {
       <PageHeader
         title="Channels"
         description="Your registered YouTube channels and their settings"
+        action={
+          <button onClick={() => void load()} className="btn-secondary">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </button>
+        }
       />
 
       {error && isDatabaseError(error) ? (
@@ -60,8 +66,13 @@ export function ChannelsPage() {
       ) : channels.length === 0 ? (
         <EmptyState
           icon={Film}
-          title="No channels registered"
-          description="Run npm run setup on your computer to add your first channel to the database."
+          title="No channels yet"
+          description="Connect your YouTube channel on the Connect page, then tap Save channel (not just Sign in with Google)."
+          action={
+            <Link to="/setup" className="btn-primary">
+              <Link2 className="h-4 w-4" /> Go to Connect
+            </Link>
+          }
         />
       ) : (
         <div className="grid gap-4">
