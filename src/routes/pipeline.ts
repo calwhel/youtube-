@@ -20,6 +20,10 @@ export function getRunningChannelCount(): number {
   return runningChannels.size;
 }
 
+export function getRunningChannelIds(): string[] {
+  return [...runningChannels];
+}
+
 export function createPipelineRoutes(
   router: Router,
   platform: PlatformConfig,
@@ -39,25 +43,45 @@ export function createPipelineRoutes(
     }
 
     if (runningChannels.has(channelId)) {
-      res.status(409).json({ error: "Pipeline is already running for this channel" });
+      res.status(409).json({
+        error: "Pipeline is already running for this channel",
+        status: "running",
+        channel_id: channelId,
+      });
       return;
     }
 
-    runningChannels.add(channelId);
     const topic =
       typeof req.body?.topic === "string" ? req.body.topic : undefined;
 
-    try {
-      const result = await orchestrator.run({ channelId, topic });
-      res.status(200).json({ success: true, result });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[pipeline] channel=${channelId} failed:`, message);
-      res.status(500).json({ success: false, error: message });
-    } finally {
-      runningChannels.delete(channelId);
-    }
+    runningChannels.add(channelId);
+
+    void (async () => {
+      try {
+        await orchestrator.run({ channelId, topic });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[pipeline] channel=${channelId} failed:`, message);
+      } finally {
+        runningChannels.delete(channelId);
+      }
+    })();
+
+    res.status(202).json({
+      success: true,
+      status: "started",
+      channel_id: channelId,
+      message:
+        "Video is generating in the background. Check the Review tab in 5–10 minutes.",
+    });
   };
+
+  router.get("/pipeline/status", (_req, res) => {
+    res.status(200).json({
+      running_count: getRunningChannelCount(),
+      running_channel_ids: getRunningChannelIds(),
+    });
+  });
 
   router.post("/run-pipeline", (req, res) => {
     void handleRunPipeline(req, res);

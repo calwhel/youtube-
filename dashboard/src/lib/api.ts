@@ -52,6 +52,7 @@ async function request<T>(
 export interface HealthResponse {
   status: string;
   runningPipelines: number;
+  runningChannelIds?: string[];
   timestamp: string;
 }
 
@@ -161,19 +162,17 @@ export interface CostRow {
   video_count: number;
 }
 
-export interface PipelineResult {
+export interface PipelineStartResult {
   success: boolean;
-  result?: {
-    title: string;
-    topic: string;
-    videoUrl: string;
-    dbVideoId: string;
-    costUsd: number;
-    qualityScore: number | null;
-    autoPublished: boolean;
-    shortVideoUrl: string | null;
-  };
+  status: "started" | "running";
+  channel_id: string;
+  message?: string;
   error?: string;
+}
+
+export interface PipelineStatusResult {
+  running_count: number;
+  running_channel_ids: string[];
 }
 
 export const api = {
@@ -228,8 +227,11 @@ export const api = {
   readiness: () =>
     request<{ channels: YppReport[] }>("/api/monetization/readiness"),
 
+  pipelineStatus: () =>
+    request<PipelineStatusResult>("/api/pipeline/status"),
+
   runPipeline: (channelId: string, topic?: string) =>
-    request<PipelineResult>("/api/run-pipeline", {
+    request<PipelineStartResult>("/api/run-pipeline", {
       method: "POST",
       body: JSON.stringify({ channel_id: channelId, topic }),
     }),
