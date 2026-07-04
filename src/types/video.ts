@@ -67,8 +67,38 @@ export interface VideoRecord {
   authenticity_score: string | null;
   inauthenticity_risk_score: string | null;
   creatomate_template_used: string | null;
-  sources_cited: string[] | null;
+  sources_cited: string[] | unknown;
+  description: string | null;
+  tags: string[] | unknown;
+  thumbnail_text: string | null;
+  short_title: string | null;
   published_at: Date | null;
+}
+
+export interface VideoReviewView {
+  id: string;
+  channel_id: string;
+  channel_name: string;
+  topic: string | null;
+  title: string | null;
+  description: string | null;
+  tags: string[];
+  thumbnail_text: string | null;
+  pinned_comment_text: string | null;
+  status: VideoStatus;
+  youtube_video_id: string | null;
+  short_youtube_video_id: string | null;
+  youtube_embed_url: string | null;
+  youtube_watch_url: string | null;
+  thumbnail_url: string | null;
+  created_at: string;
+  cost_usd: number;
+  quality_score: number | null;
+  quality_notes: string | null;
+  authenticity_score: number | null;
+  inauthenticity_risk_score: number | null;
+  thumbnail_uploaded: boolean;
+  unique_thesis: string | null;
 }
 
 export interface PendingVideoView {

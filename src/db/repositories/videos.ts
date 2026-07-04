@@ -4,6 +4,7 @@ import type {
   TopPerformingTopic,
   VideoAnalyticsUpdate,
   VideoRecord,
+  VideoReviewView,
   VideoStatus,
 } from "../../types/video";
 import { query, queryOne } from "../pool";
@@ -48,6 +49,10 @@ export class VideoRepository {
       inauthenticityRiskScore: number | null;
       creatomateTemplateUsed: string | null;
       sourcesCited: string[] | null;
+      description: string | null;
+      tags: string[] | null;
+      thumbnailText: string | null;
+      shortTitle: string | null;
     },
   ): Promise<VideoRecord | null> {
     return queryOne<VideoRecord>(
@@ -70,7 +75,11 @@ export class VideoRepository {
         authenticity_score = $14,
         inauthenticity_risk_score = $15,
         creatomate_template_used = $16,
-        sources_cited = $17
+        sources_cited = $17,
+        description = $18,
+        tags = $19,
+        thumbnail_text = $20,
+        short_title = $21
       WHERE id = $1
       RETURNING *
       `,
@@ -92,8 +101,140 @@ export class VideoRepository {
         data.inauthenticityRiskScore,
         data.creatomateTemplateUsed,
         data.sourcesCited ? JSON.stringify(data.sourcesCited) : null,
+        data.description,
+        data.tags ? JSON.stringify(data.tags) : null,
+        data.thumbnailText,
+        data.shortTitle,
       ],
     );
+  }
+
+  async updateReviewMetadata(
+    videoId: string,
+    data: {
+      title?: string;
+      description?: string;
+      tags?: string[];
+    },
+  ): Promise<VideoRecord | null> {
+    const existing = await this.findById(videoId);
+    if (!existing) {
+      return null;
+    }
+
+    return queryOne<VideoRecord>(
+      `
+      UPDATE videos
+      SET
+        title = COALESCE($2, title),
+        description = COALESCE($3, description),
+        tags = COALESCE($4, tags)
+      WHERE id = $1
+      RETURNING *
+      `,
+      [
+        videoId,
+        data.title ?? null,
+        data.description ?? null,
+        data.tags ? JSON.stringify(data.tags) : null,
+      ],
+    );
+  }
+
+  async findReviewById(videoId: string): Promise<VideoReviewView | null> {
+    const row = await queryOne<{
+      id: string;
+      channel_id: string;
+      channel_name: string;
+      topic: string | null;
+      title: string | null;
+      description: string | null;
+      tags: unknown;
+      thumbnail_text: string | null;
+      pinned_comment_text: string | null;
+      status: VideoStatus;
+      youtube_video_id: string | null;
+      short_youtube_video_id: string | null;
+      created_at: Date;
+      cost_usd: string;
+      quality_score: string | null;
+      quality_notes: string | null;
+      authenticity_score: string | null;
+      inauthenticity_risk_score: string | null;
+      thumbnail_uploaded: boolean;
+      unique_thesis: string | null;
+    }>(
+      `
+      SELECT
+        v.id,
+        v.channel_id,
+        c.name AS channel_name,
+        v.topic,
+        v.title,
+        v.description,
+        v.tags,
+        v.thumbnail_text,
+        v.pinned_comment_text,
+        v.status,
+        v.youtube_video_id,
+        v.short_youtube_video_id,
+        v.created_at,
+        v.cost_usd,
+        v.quality_score,
+        v.quality_notes,
+        v.authenticity_score,
+        v.inauthenticity_risk_score,
+        v.thumbnail_uploaded,
+        v.unique_thesis
+      FROM videos v
+      INNER JOIN channels c ON c.id = v.channel_id
+      WHERE v.id = $1
+        AND v.video_type = 'long'
+      `,
+      [videoId],
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    const tags = Array.isArray(row.tags)
+      ? row.tags.filter((t): t is string => typeof t === "string")
+      : [];
+
+    const ytId = row.youtube_video_id;
+
+    return {
+      id: row.id,
+      channel_id: row.channel_id,
+      channel_name: row.channel_name,
+      topic: row.topic,
+      title: row.title,
+      description: row.description,
+      tags,
+      thumbnail_text: row.thumbnail_text,
+      pinned_comment_text: row.pinned_comment_text,
+      status: row.status,
+      youtube_video_id: ytId,
+      short_youtube_video_id: row.short_youtube_video_id,
+      youtube_embed_url: ytId ? `https://www.youtube.com/embed/${ytId}` : null,
+      youtube_watch_url: ytId ? `https://www.youtube.com/watch?v=${ytId}` : null,
+      thumbnail_url: ytId
+        ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
+        : null,
+      created_at: row.created_at.toISOString(),
+      cost_usd: Number(row.cost_usd),
+      quality_score: row.quality_score ? Number(row.quality_score) : null,
+      quality_notes: row.quality_notes,
+      authenticity_score: row.authenticity_score
+        ? Number(row.authenticity_score)
+        : null,
+      inauthenticity_risk_score: row.inauthenticity_risk_score
+        ? Number(row.inauthenticity_risk_score)
+        : null,
+      thumbnail_uploaded: row.thumbnail_uploaded,
+      unique_thesis: row.unique_thesis,
+    };
   }
 
   async markFailed(videoId: string): Promise<void> {

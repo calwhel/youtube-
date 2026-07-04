@@ -91,6 +91,45 @@ export interface PendingVideo {
   thumbnail_uploaded: boolean;
 }
 
+export interface VideoReviewView {
+  id: string;
+  channel_id: string;
+  channel_name: string;
+  topic: string | null;
+  title: string | null;
+  description: string | null;
+  tags: string[];
+  thumbnail_text: string | null;
+  pinned_comment_text: string | null;
+  status: string;
+  youtube_video_id: string | null;
+  short_youtube_video_id: string | null;
+  youtube_embed_url: string | null;
+  youtube_watch_url: string | null;
+  thumbnail_url: string | null;
+  created_at: string;
+  cost_usd: number;
+  quality_score: number | null;
+  quality_notes: string | null;
+  authenticity_score: number | null;
+  inauthenticity_risk_score: number | null;
+  thumbnail_uploaded: boolean;
+  unique_thesis: string | null;
+}
+
+export interface CreateChannelPayload {
+  name: string;
+  niche_prompt: string;
+  youtube_client_id: string;
+  youtube_client_secret: string;
+  youtube_refresh_token: string;
+  elevenlabs_voice_id: string;
+  creatomate_template_id: string;
+  creatomate_template_ids?: string[];
+  upload_frequency?: string;
+  status?: "active" | "paused";
+}
+
 export interface YppChecklistItem {
   id: string;
   label: string;
@@ -143,6 +182,33 @@ export const api = {
   channels: () =>
     request<{ channels: Channel[] }>("/api/channels"),
 
+  createChannel: (payload: CreateChannelPayload) =>
+    request<{ channel: Channel }>("/api/channels", {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        creatomate_template_ids: payload.creatomate_template_ids ?? [
+          payload.creatomate_template_id,
+        ],
+        auto_publish: false,
+        review_mode: "required",
+        max_videos_per_week: 3,
+        disclose_synthetic_media: true,
+      }),
+    }),
+
+  getVideo: (videoId: string) =>
+    request<{ video: VideoReviewView }>(`/api/videos/${videoId}`),
+
+  updateVideo: (
+    videoId: string,
+    data: { title?: string; description?: string; tags?: string[] },
+  ) =>
+    request<{ video: VideoReviewView }>(`/api/videos/${videoId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
   pending: () =>
     request<{ videos: PendingVideo[] }>("/api/pending"),
 
@@ -168,9 +234,10 @@ export const api = {
       body: JSON.stringify({ channel_id: channelId, topic }),
     }),
 
-  publish: (videoId: string) =>
+  publish: (videoId: string, data?: { description?: string; tags?: string[]; title?: string }) =>
     request<{ success: boolean }>(`/api/publish/${videoId}`, {
       method: "POST",
+      body: JSON.stringify(data ?? {}),
     }),
 
   syncAnalytics: () =>
