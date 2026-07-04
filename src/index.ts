@@ -28,6 +28,15 @@ async function main(): Promise<void> {
     });
   });
 
+  app.get("/", (_req, res) => {
+    res.status(200).json({
+      status: "ok",
+      message: "YouTube pipeline is running",
+      health: "/health",
+      api: "/api (requires x-auth-token header)",
+    });
+  });
+
   app.get("/internal/assets/:token", (req, res) => {
     const asset = streamTransientAsset(req.params.token);
     if (!asset) {
