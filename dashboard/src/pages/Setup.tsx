@@ -104,6 +104,7 @@ export function SetupPage() {
   const [youtubeConnected, setYoutubeConnected] = useState(false);
   const [redirectUri, setRedirectUri] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showAddChannel, setShowAddChannel] = useState(false);
   const [form, setForm] = useState(() => ({
     ...emptyForm,
     ...loadSetupDraft(),
@@ -146,7 +147,8 @@ export function SetupPage() {
       return;
     }
 
-    if (oauthResult === "success" && state) {
+      if (oauthResult === "success" && state) {
+      setShowAddChannel(true);
       void finishOAuth(state);
     }
   }, [searchParams, setSearchParams]);
@@ -281,83 +283,16 @@ export function SetupPage() {
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-3">
-            <h2 className="font-display text-lg font-semibold">Quick setup (5 minutes)</h2>
-
-            <GuideSection title="Step 1 — Google Cloud (one time)" defaultOpen>
-              <ol className="list-decimal space-y-2 pl-4">
-                <li>
-                  Open{" "}
-                  <a
-                    className="text-brand hover:underline"
-                    href="https://console.cloud.google.com/apis/library/youtube.googleapis.com"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Google Cloud Console
-                  </a>
-                </li>
-                <li>Enable <strong>YouTube Data API v3</strong> and <strong>YouTube Analytics API</strong></li>
-                <li>
-                  Credentials → Create OAuth client → type <strong>Web application</strong>
-                </li>
-                <li>
-                  Under <strong>Authorized redirect URIs</strong>, paste this exact URL:
-                </li>
-              </ol>
-              {redirectUri ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-overlay/80 p-3">
-                  <code className="flex-1 break-all text-xs text-zinc-200">{redirectUri}</code>
-                  <button
-                    type="button"
-                    onClick={() => void copyRedirectUri()}
-                    className="btn-ghost shrink-0 p-2"
-                    title="Copy"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <p className="mt-2 text-xs text-zinc-500">Loading redirect URL...</p>
-              )}
-              {copied && (
-                <p className="mt-2 text-xs text-emerald-400">Copied!</p>
-              )}
-              <p className="mt-3">
-                Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> into the form →
-              </p>
-            </GuideSection>
-
-            <GuideSection title="Step 2 — Sign in with Google (in this app)">
-              <p>
-                Paste Client ID + Secret, then click <strong>Sign in with Google</strong>.
-                You’ll pick your YouTube channel in Google’s popup — no commands to run on your computer.
-              </p>
-            </GuideSection>
-
-            <GuideSection title="Step 3 — ElevenLabs voice">
-              <ol className="list-decimal space-y-2 pl-4">
-                <li>
-                  <a className="text-brand hover:underline" href="https://elevenlabs.io" target="_blank" rel="noreferrer">
-                    elevenlabs.io
-                  </a>{" "}
-                  → Voice Library → copy a Voice ID
-                </li>
-              </ol>
-            </GuideSection>
-
-            <GuideSection title="Railway API keys">
-              <p>
-                Anthropic and ElevenLabs API keys live in Railway → Variables on your app service.
-                This page only connects your YouTube channel and voice.
-              </p>
-            </GuideSection>
-
-            {channels.length > 0 && (
-              <div className="glass rounded-2xl p-5">
-                <h3 className="mb-3 flex items-center gap-2 font-medium text-emerald-400">
-                  <CheckCircle2 className="h-5 w-5" /> Connected channels
-                </h3>
-                <ul className="space-y-2">
+            {channels.length > 0 ? (
+              <div className="glass rounded-2xl p-5 shadow-card">
+                <h2 className="font-display text-lg font-semibold text-emerald-400 flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" /> You&apos;re connected
+                </h2>
+                <p className="mt-2 text-sm text-zinc-400">
+                  Your YouTube channel is saved in the database. You only need
+                  to sign in with Google again if you add a new channel.
+                </p>
+                <ul className="mt-4 space-y-2">
                   {channels.map((ch) => (
                     <li
                       key={ch.id}
@@ -368,27 +303,116 @@ export function SetupPage() {
                     </li>
                   ))}
                 </ul>
-                <Link to="/generate" className="btn-primary mt-4 inline-flex">
-                  <Sparkles className="h-4 w-4" /> Generate first video
-                </Link>
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit} className="glass rounded-2xl p-6 shadow-card space-y-4">
-            {channels.length > 0 ? (
-              <div className="space-y-4">
-                <h2 className="font-display text-lg font-semibold text-emerald-400 flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5" /> Channel already connected
-                </h2>
-                <p className="text-sm text-zinc-400">
-                  You&apos;re set up. Generate a video or add another channel below.
-                </p>
-                <Link to="/generate" className="btn-primary inline-flex w-full justify-center">
+                <Link to="/generate" className="btn-primary mt-4 inline-flex w-full justify-center">
                   <Sparkles className="h-4 w-4" /> Generate video
                 </Link>
               </div>
-            ) : null}
+            ) : (
+              <>
+                <h2 className="font-display text-lg font-semibold">Quick setup (5 minutes)</h2>
+
+                <GuideSection title="Step 1 — Google Cloud (one time)" defaultOpen>
+                  <ol className="list-decimal space-y-2 pl-4">
+                    <li>
+                      Open{" "}
+                      <a
+                        className="text-brand hover:underline"
+                        href="https://console.cloud.google.com/apis/library/youtube.googleapis.com"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Google Cloud Console
+                      </a>
+                    </li>
+                    <li>Enable <strong>YouTube Data API v3</strong> and <strong>YouTube Analytics API</strong></li>
+                    <li>
+                      Credentials → Create OAuth client → type <strong>Web application</strong>
+                    </li>
+                    <li>
+                      Under <strong>Authorized redirect URIs</strong>, paste this exact URL:
+                    </li>
+                  </ol>
+                  {redirectUri ? (
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-overlay/80 p-3">
+                      <code className="flex-1 break-all text-xs text-zinc-200">{redirectUri}</code>
+                      <button
+                        type="button"
+                        onClick={() => void copyRedirectUri()}
+                        className="btn-ghost shrink-0 p-2"
+                        title="Copy"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-zinc-500">Loading redirect URL...</p>
+                  )}
+                  {copied && (
+                    <p className="mt-2 text-xs text-emerald-400">Copied!</p>
+                  )}
+                  <p className="mt-3">
+                    Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> into the form →
+                  </p>
+                </GuideSection>
+
+                <GuideSection title="Step 2 — Sign in with Google (in this app)">
+                  <p>
+                    Paste Client ID + Secret, then click <strong>Sign in with Google</strong>.
+                    You’ll pick your YouTube channel in Google’s popup — no commands to run on your computer.
+                  </p>
+                </GuideSection>
+
+                <GuideSection title="Step 3 — ElevenLabs voice">
+                  <ol className="list-decimal space-y-2 pl-4">
+                    <li>
+                      <a className="text-brand hover:underline" href="https://elevenlabs.io" target="_blank" rel="noreferrer">
+                        elevenlabs.io
+                      </a>{" "}
+                      → Voice Library → copy a Voice ID
+                    </li>
+                  </ol>
+                </GuideSection>
+
+                <GuideSection title="Railway API keys">
+                  <p>
+                    Anthropic and ElevenLabs API keys live in Railway → Variables on your app service.
+                    This page only connects your YouTube channel and voice.
+                  </p>
+                </GuideSection>
+              </>
+            )}
+          </div>
+
+          {channels.length > 0 && !showAddChannel ? (
+            <div className="glass rounded-2xl p-6 shadow-card space-y-4">
+              <h2 className="font-display text-lg font-semibold text-emerald-400 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" /> Nothing else to connect
+              </h2>
+              <p className="text-sm text-zinc-400">
+                Go to Create to generate a video, or open Review to publish one.
+              </p>
+              <Link to="/generate" className="btn-primary inline-flex w-full justify-center">
+                <Sparkles className="h-4 w-4" /> Create video
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowAddChannel(true)}
+                className="btn-secondary w-full"
+              >
+                Add another channel
+              </button>
+            </div>
+          ) : (
+          <form onSubmit={handleSubmit} className="glass rounded-2xl p-6 shadow-card space-y-4">
+            {channels.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAddChannel(false)}
+                className="btn-ghost w-full text-xs"
+              >
+                Cancel — back to connected channels
+              </button>
+            )}
 
             <h2 className="font-display text-lg font-semibold flex items-center gap-2">
               <Link2 className="h-5 w-5 text-brand" />
@@ -450,6 +474,7 @@ export function SetupPage() {
               {submitting ? "Saving..." : "Save channel"}
             </button>
           </form>
+          )}
         </div>
       )}
     </Layout>

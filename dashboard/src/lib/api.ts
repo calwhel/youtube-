@@ -1,17 +1,3 @@
-const TOKEN_KEY = "pipeline_auth_token";
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -28,18 +14,27 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
 }
 
+export interface SessionResponse {
+  ok: true;
+  database: "connected" | "disconnected";
+  database_error?: string;
+  channels: Array<{ id: string; name: string }>;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getToken();
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
-  if (token) {
-    headers.set("x-auth-token", token);
+  if (!headers.has("Content-Type") && options.body) {
+    headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(path, { ...options, headers });
+  const response = await fetch(path, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
   const data = (await response.json().catch(() => ({}))) as Record<
     string,
     unknown
@@ -47,7 +42,6 @@ async function request<T>(
 
   if (!response.ok) {
     if (response.status === 401) {
-      clearToken();
       onUnauthorized?.();
     }
     throw new ApiError(
@@ -197,6 +191,19 @@ export interface PipelineStatusResult {
 }
 
 export const api = {
+  session: () => request<SessionResponse>("/api/auth/session"),
+
+  login: (token: string) =>
+    request<SessionResponse>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+
+  logout: () =>
+    request<{ ok: true }>("/api/auth/logout", {
+      method: "POST",
+    }),
+
   health: () => request<HealthResponse>("/health"),
 
   channels: () =>

@@ -8,43 +8,77 @@ import {
   type ReactNode,
 } from "react";
 
-import { clearToken, getToken, setToken, setUnauthorizedHandler } from "./api";
+import { api, setUnauthorizedHandler, type SessionResponse } from "./api";
 
 interface AuthContextValue {
-  token: string | null;
   isAuthenticated: boolean;
-  login: (token: string) => void;
-  logout: () => void;
+  isBootstrapping: boolean;
+  channels: SessionResponse["channels"];
+  login: (token: string) => Promise<SessionResponse>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(() => getToken());
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [channels, setChannels] = useState<SessionResponse["channels"]>([]);
 
-  const login = useCallback((value: string) => {
-    setToken(value.trim());
-    setTokenState(value.trim());
+  const applySession = useCallback((session: SessionResponse) => {
+    setChannels(session.channels);
+    setIsAuthenticated(true);
   }, []);
 
-  const logout = useCallback(() => {
-    clearToken();
-    setTokenState(null);
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Cookie may already be cleared — still sign out locally.
+    }
+    setChannels([]);
+    setIsAuthenticated(false);
+  }, []);
+
+  const login = useCallback(
+    async (token: string) => {
+      const session = await api.login(token);
+      applySession(session);
+      return session;
+    },
+    [applySession],
+  );
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setChannels([]);
+      setIsAuthenticated(false);
+    });
+    return () => setUnauthorizedHandler(() => {});
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler(logout);
-    return () => setUnauthorizedHandler(() => {});
-  }, [logout]);
+    void (async () => {
+      try {
+        const session = await api.session();
+        applySession(session);
+      } catch {
+        setIsAuthenticated(false);
+      } finally {
+        setIsBootstrapping(false);
+      }
+    })();
+  }, [applySession]);
 
   const value = useMemo(
     () => ({
-      token,
-      isAuthenticated: Boolean(token),
+      isAuthenticated,
+      isBootstrapping,
+      channels,
       login,
       logout,
     }),
-    [token, login, logout],
+    [isAuthenticated, isBootstrapping, channels, login, logout],
   );
 
   return (

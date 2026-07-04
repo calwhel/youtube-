@@ -92,6 +92,19 @@ export function OverviewPage() {
         error && <ErrorBanner message={error} />
       )}
 
+      {channels.length > 0 && !error && (
+        <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-200">
+          <p className="font-medium text-emerald-100">
+            You&apos;re all set — {channels.map((c) => c.name).join(", ")}{" "}
+            {channels.length === 1 ? "is" : "are"} connected.
+          </p>
+          <p className="mt-1 text-emerald-200/80">
+            Your YouTube channel stays saved in the database. Logging in again
+            never requires reconnecting Google.
+          </p>
+        </div>
+      )}
+
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="System Status"
@@ -173,7 +186,12 @@ export function OverviewPage() {
             <EmptyState
               icon={Users}
               title="No channels yet"
-              description="Run npm run setup locally to register your first channel."
+              description="Open Connect to link your YouTube channel in the browser — no terminal needed."
+              action={
+                <Link to="/setup" className="btn-primary">
+                  Connect Channel
+                </Link>
+              }
             />
           ) : (
             <ul className="space-y-3">

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { LoginPage } from "./components/LoginPage";
+import { LoadingSpinner } from "./components/Layout";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { AnalyticsPage } from "./pages/Analytics";
 import { ChannelsPage } from "./pages/Channels";
@@ -12,7 +13,16 @@ import { SetupPage } from "./pages/Setup";
 import { VideoReviewPage } from "./pages/VideoReview";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isBootstrapping } = useAuth();
+
+  if (isBootstrapping) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner label="Restoring your session..." />
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -20,7 +30,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isBootstrapping } = useAuth();
+
+  if (isBootstrapping) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner label="Restoring your session..." />
+      </div>
+    );
+  }
 
   return (
     <Routes>
