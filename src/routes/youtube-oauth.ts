@@ -20,7 +20,12 @@ function youtubeRedirectUri(config: PlatformConfig): string {
   return `${config.publicBaseUrl}/api/youtube/oauth/callback`;
 }
 
-function parseStartBody(body: unknown): { clientId: string; clientSecret: string } {
+function parseStartBody(body: unknown): {
+  clientId: string;
+  clientSecret: string;
+  returnPath?: string;
+  channelId?: string;
+} {
   if (!body || typeof body !== "object") {
     throw new Error("Request body must be a JSON object");
   }
@@ -30,12 +35,20 @@ function parseStartBody(body: unknown): { clientId: string; clientSecret: string
     typeof record.client_id === "string" ? record.client_id.trim() : "";
   const clientSecret =
     typeof record.client_secret === "string" ? record.client_secret.trim() : "";
+  const returnPath =
+    typeof record.return_path === "string" ? record.return_path.trim() : undefined;
+  const channelId =
+    typeof record.channel_id === "string" ? record.channel_id.trim() : undefined;
 
   if (!clientId || !clientSecret) {
     throw new Error("Client ID and Client Secret are required");
   }
 
-  return { clientId, clientSecret };
+  if (returnPath && !returnPath.startsWith("/")) {
+    throw new Error("return_path must start with /");
+  }
+
+  return { clientId, clientSecret, returnPath, channelId };
 }
 
 export function createYoutubeOAuthRoutes(
@@ -51,8 +64,11 @@ export function createYoutubeOAuthRoutes(
 
   router.post("/youtube/oauth/start", (req, res) => {
     try {
-      const { clientId, clientSecret } = parseStartBody(req.body);
-      const state = createPendingOAuth(clientId, clientSecret);
+      const { clientId, clientSecret, returnPath, channelId } = parseStartBody(req.body);
+      const state = createPendingOAuth(clientId, clientSecret, {
+        returnPath,
+        channelId,
+      });
       const redirectUri = youtubeRedirectUri(config);
 
       const oauth2Client = new google.auth.OAuth2(
@@ -109,6 +125,8 @@ export function createYoutubeOAuthRoutes(
       refresh_token: session.refreshToken,
       client_id: session.clientId,
       client_secret: session.clientSecret,
+      channel_id: session.channelId,
+      return_path: session.returnPath,
     });
   });
 }
@@ -129,10 +147,13 @@ export async function handleYoutubeOAuthCallback(
     return;
   }
 
+  const pendingSession = getPendingOAuth(state)!;
+  const returnBase = `${config.publicBaseUrl}${pendingSession.returnPath}`;
+
   if (error) {
     setPendingOAuthResult(state, { error });
     res.redirect(
-      `${setupUrl}?youtube_oauth=error&state=${encodeURIComponent(state)}`,
+      `${returnBase}?youtube_oauth=error&state=${encodeURIComponent(state)}`,
     );
     return;
   }
@@ -140,12 +161,12 @@ export async function handleYoutubeOAuthCallback(
   if (!code) {
     setPendingOAuthResult(state, { error: "No authorization code returned" });
     res.redirect(
-      `${setupUrl}?youtube_oauth=error&state=${encodeURIComponent(state)}`,
+      `${returnBase}?youtube_oauth=error&state=${encodeURIComponent(state)}`,
     );
     return;
   }
 
-  const pending = getPendingOAuth(state)!;
+  const pending = pendingSession;
   const redirectUri = youtubeRedirectUri(config);
 
   try {
@@ -164,21 +185,21 @@ export async function handleYoutubeOAuthCallback(
           "No refresh token returned. In Google Account → Security → Third-party access, remove this app and connect again.",
       });
       res.redirect(
-        `${setupUrl}?youtube_oauth=error&state=${encodeURIComponent(state)}`,
+        `${returnBase}?youtube_oauth=error&state=${encodeURIComponent(state)}`,
       );
       return;
     }
 
     setPendingOAuthResult(state, { refreshToken });
     res.redirect(
-      `${setupUrl}?youtube_oauth=success&state=${encodeURIComponent(state)}`,
+      `${returnBase}?youtube_oauth=success&state=${encodeURIComponent(state)}`,
     );
   } catch (tokenError) {
     const message =
       tokenError instanceof Error ? tokenError.message : String(tokenError);
     setPendingOAuthResult(state, { error: message });
     res.redirect(
-      `${setupUrl}?youtube_oauth=error&state=${encodeURIComponent(state)}&message=${encodeURIComponent(message)}`,
+      `${returnBase}?youtube_oauth=error&state=${encodeURIComponent(state)}&message=${encodeURIComponent(message)}`,
     );
   }
 }

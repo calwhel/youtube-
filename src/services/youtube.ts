@@ -5,6 +5,7 @@ import type { ServiceConfig } from "../config/channel-config";
 import type { VideoAnalyticsUpdate, VideoPayload } from "../types/video";
 import { buildDescriptionWithChapters } from "./quality-gate";
 import { withRetry } from "../utils/tmp";
+import { formatYouTubeAuthError } from "../utils/youtube-auth-error";
 
 export interface YouTubeUploadResult {
   videoId: string;
@@ -46,6 +47,22 @@ export class YouTubeService {
       version: "v2",
       auth: this.oauth2Client,
     });
+  }
+
+  async verifyConnection(): Promise<{ ok: true; channelTitle: string | null }> {
+    try {
+      const response = await this.youtube.channels.list({
+        part: ["snippet"],
+        mine: true,
+        maxResults: 1,
+      });
+
+      const title = response.data.items?.[0]?.snippet?.title ?? null;
+      return { ok: true, channelTitle: title };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(formatYouTubeAuthError(message));
+    }
   }
 
   async uploadVideo(

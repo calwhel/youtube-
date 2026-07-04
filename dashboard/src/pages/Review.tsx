@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { PlayCircle, RefreshCw, Sparkles } from "lucide-react";
 
 import { api, type PendingVideo, type VideoActivity } from "../lib/api";
+import { formatPipelineError, isYouTubeAuthError } from "../lib/errors";
 import {
   EmptyState,
   ErrorBanner,
@@ -81,11 +82,21 @@ export function ReviewPage() {
                   <p className="font-medium">{item.title ?? item.topic ?? "Untitled"}</p>
                   <p className="mt-1 text-xs text-zinc-400">{item.channel_name}</p>
                   <p className="mt-2 text-xs text-red-200">
-                    {item.quality_notes ?? "Generation failed — check Railway variables (ANTHROPIC_MODEL, API keys)."}
+                    {formatPipelineError(
+                      item.quality_notes ??
+                        "Generation failed — check Railway variables (ANTHROPIC_MODEL, API keys).",
+                    )}
                   </p>
-                  <Link to="/generate" className="btn-secondary mt-3 inline-flex text-xs">
-                    Try again on Create
-                  </Link>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {isYouTubeAuthError(item.quality_notes ?? "") && (
+                      <Link to="/channels" className="btn-primary inline-flex text-xs">
+                        Reconnect YouTube
+                      </Link>
+                    )}
+                    <Link to="/generate" className="btn-secondary inline-flex text-xs">
+                      Try again on Create
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>

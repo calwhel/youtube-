@@ -64,6 +64,7 @@ export interface Channel {
   id: string;
   name: string;
   niche_prompt: string;
+  youtube_client_id: string;
   status: "active" | "paused";
   upload_frequency: string;
   monthly_budget_usd: number;
@@ -297,12 +298,18 @@ export const api = {
       "/api/youtube/oauth/config",
     ),
 
-  youtubeOAuthStart: (clientId: string, clientSecret: string) =>
+  youtubeOAuthStart: (
+    clientId: string,
+    clientSecret: string,
+    options?: { returnPath?: string; channelId?: string },
+  ) =>
     request<{ auth_url: string; state: string }>("/api/youtube/oauth/start", {
       method: "POST",
       body: JSON.stringify({
         client_id: clientId,
         client_secret: clientSecret,
+        return_path: options?.returnPath,
+        channel_id: options?.channelId,
       }),
     }),
 
@@ -311,5 +318,24 @@ export const api = {
       refresh_token: string;
       client_id: string;
       client_secret: string;
+      channel_id: string | null;
+      return_path: string;
     }>(`/api/youtube/oauth/token?state=${encodeURIComponent(state)}`),
+
+  updateChannel: (
+    channelId: string,
+    payload: Partial<CreateChannelPayload>,
+  ) =>
+    request<{ channel: Channel }>(`/api/channels/${channelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  channelYoutubeStatus: (channelId: string) =>
+    request<{
+      ok: boolean;
+      connected: boolean;
+      channel_title?: string | null;
+      error?: string;
+    }>(`/api/channels/${channelId}/youtube-status`),
 };

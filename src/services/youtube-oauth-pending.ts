@@ -4,6 +4,8 @@ export interface YoutubeOAuthPending {
   refreshToken: string | null;
   error: string | null;
   createdAt: number;
+  returnPath: string;
+  channelId: string | null;
 }
 
 const TTL_MS = 15 * 60 * 1000;
@@ -21,6 +23,7 @@ function purgeExpired(): void {
 export function createPendingOAuth(
   clientId: string,
   clientSecret: string,
+  options?: { returnPath?: string; channelId?: string },
 ): string {
   purgeExpired();
   const state = crypto.randomUUID();
@@ -30,6 +33,8 @@ export function createPendingOAuth(
     refreshToken: null,
     error: null,
     createdAt: Date.now(),
+    returnPath: options?.returnPath ?? "/setup",
+    channelId: options?.channelId ?? null,
   });
   return state;
 }
@@ -63,6 +68,8 @@ export function consumePendingOAuthSession(state: string): {
   refreshToken: string;
   clientId: string;
   clientSecret: string;
+  returnPath: string;
+  channelId: string | null;
 } | null {
   const entry = pending.get(state);
   if (!entry?.refreshToken) {
@@ -73,6 +80,8 @@ export function consumePendingOAuthSession(state: string): {
     refreshToken: entry.refreshToken,
     clientId: entry.clientId,
     clientSecret: entry.clientSecret,
+    returnPath: entry.returnPath,
+    channelId: entry.channelId,
   };
   pending.delete(state);
   return session;
