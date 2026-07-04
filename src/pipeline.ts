@@ -7,7 +7,7 @@ import { LlmService } from "./services/llm";
 import { NotificationService } from "./services/notifications";
 import { PublishFinalizer } from "./services/publish-finalizer";
 import { runAuthenticityGate } from "./services/authenticity-gate";
-import { runQualityGate } from "./services/quality-gate";
+import { runQualityGate, buildDescriptionWithChapters } from "./services/quality-gate";
 import { ShortsService } from "./services/shorts";
 import { ThumbnailService } from "./services/thumbnail";
 import { TopicResearchService } from "./services/topic-research";
@@ -241,6 +241,10 @@ export class PipelineOrchestrator {
         inauthenticityRiskScore: inauthenticityRisk,
         creatomateTemplateUsed: selectedTemplateId,
         sourcesCited: payload.sources_cited,
+        description: buildDescriptionWithChapters(payload),
+        tags: payload.tags,
+        thumbnailText: payload.thumbnail_text,
+        shortTitle: payload.short_title,
       });
       await this.topicsUsed.recordTopic(channel.id, payload.topic);
 

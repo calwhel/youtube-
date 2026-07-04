@@ -55,6 +55,9 @@ export class YouTubeService {
     return withRetry(
       async () => {
         const privacyStatus = this.config.youtube.privacyStatus;
+        // Unlisted allows in-dashboard embed preview; publish step sets public
+        const uploadPrivacy =
+          privacyStatus === "private" ? "unlisted" : privacyStatus;
         const description = buildDescriptionWithChapters(payload);
 
         const response = await this.youtube.videos.insert({
@@ -67,7 +70,7 @@ export class YouTubeService {
               categoryId: this.config.youtube.categoryId,
             },
             status: {
-              privacyStatus,
+              privacyStatus: uploadPrivacy,
               selfDeclaredMadeForKids: false,
               containsSyntheticMedia:
                 this.config.youtube.discloseSyntheticMedia,
@@ -88,7 +91,7 @@ export class YouTubeService {
         return {
           videoId,
           videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
-          privacyStatus,
+          privacyStatus: uploadPrivacy,
         };
       },
       {
@@ -264,6 +267,46 @@ export class YouTubeService {
       {
         ...this.config.retry,
         label: "youtube-thumbnail-upload",
+      },
+    );
+  }
+
+  async updateVideoMetadata(
+    youtubeVideoId: string,
+    input: {
+      title?: string;
+      description?: string;
+      tags?: string[];
+    },
+  ): Promise<void> {
+    await withRetry(
+      async () => {
+        const current = await this.youtube.videos.list({
+          part: ["snippet"],
+          id: [youtubeVideoId],
+        });
+
+        const snippet = current.data.items?.[0]?.snippet;
+        if (!snippet) {
+          throw new Error("Video snippet not found for metadata update");
+        }
+
+        await this.youtube.videos.update({
+          part: ["snippet"],
+          requestBody: {
+            id: youtubeVideoId,
+            snippet: {
+              ...snippet,
+              title: input.title ?? snippet.title,
+              description: input.description ?? snippet.description,
+              tags: input.tags ?? snippet.tags ?? undefined,
+            },
+          },
+        });
+      },
+      {
+        ...this.config.retry,
+        label: "youtube-metadata-update",
       },
     );
   }

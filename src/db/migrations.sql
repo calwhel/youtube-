@@ -56,3 +56,9 @@ ALTER TABLE videos ADD COLUMN IF NOT EXISTS authenticity_score NUMERIC(5, 2);
 ALTER TABLE videos ADD COLUMN IF NOT EXISTS inauthenticity_risk_score NUMERIC(5, 2);
 ALTER TABLE videos ADD COLUMN IF NOT EXISTS creatomate_template_used TEXT;
 ALTER TABLE videos ADD COLUMN IF NOT EXISTS sources_cited JSONB;
+
+-- Review metadata for in-app publish workflow
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS tags JSONB;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_text TEXT;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS short_title TEXT;

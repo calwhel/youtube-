@@ -7,6 +7,7 @@ import type { PipelineOrchestrator } from "../pipeline";
 import { AnalyticsSyncService } from "../services/analytics-sync";
 import { PublishFinalizer } from "../services/publish-finalizer";
 import { ThumbnailAbService } from "../services/thumbnail-ab";
+import { YouTubeService } from "../services/youtube";
 import { YppReadinessService } from "../services/ypp-readiness";
 
 const runningChannels = new Set<string>();
@@ -74,6 +75,56 @@ export function createPipelineRoutes(
     res.status(200).json({ videos: pending });
   });
 
+  router.get("/videos/:video_id", async (req, res) => {
+    const review = await videos.findReviewById(req.params.video_id);
+    if (!review) {
+      res.status(404).json({ error: "Video not found" });
+      return;
+    }
+    res.status(200).json({ video: review });
+  });
+
+  router.patch("/videos/:video_id", async (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    const description =
+      typeof body.description === "string" ? body.description : undefined;
+    const title = typeof body.title === "string" ? body.title : undefined;
+    let tags: string[] | undefined;
+    if (Array.isArray(body.tags)) {
+      tags = body.tags.filter(
+        (t): t is string => typeof t === "string" && t.trim() !== "",
+      );
+    }
+
+    const updated = await videos.updateReviewMetadata(req.params.video_id, {
+      title,
+      description,
+      tags,
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: "Video not found" });
+      return;
+    }
+
+    const video = await videos.findById(req.params.video_id);
+    if (video?.youtube_video_id && (description || title || tags)) {
+      const channel = await channels.findDecryptedById(video.channel_id);
+      if (channel) {
+        const { buildServiceConfig } = await import("../config/channel-config");
+        const youtube = new YouTubeService(buildServiceConfig(platform, channel));
+        await youtube.updateVideoMetadata(video.youtube_video_id, {
+          title: title ?? video.title ?? undefined,
+          description: description ?? video.description ?? undefined,
+          tags: tags ?? (Array.isArray(video.tags) ? video.tags : undefined),
+        });
+      }
+    }
+
+    const review = await videos.findReviewById(req.params.video_id);
+    res.status(200).json({ video: review });
+  });
+
   router.post("/publish/:video_id", async (req, res) => {
     const video = await videos.findById(req.params.video_id);
     if (!video) {
@@ -95,6 +146,25 @@ export function createPipelineRoutes(
     }
 
     try {
+      const body = req.body as Record<string, unknown>;
+      if (
+        typeof body.description === "string" ||
+        Array.isArray(body.tags) ||
+        typeof body.title === "string"
+      ) {
+        const tags = Array.isArray(body.tags)
+          ? body.tags.filter(
+              (t): t is string => typeof t === "string" && t.trim() !== "",
+            )
+          : undefined;
+        await videos.updateReviewMetadata(video.id, {
+          title: typeof body.title === "string" ? body.title : undefined,
+          description:
+            typeof body.description === "string" ? body.description : undefined,
+          tags,
+        });
+      }
+
       const finalizer = new PublishFinalizer(platform);
       await finalizer.finalize({
         dbVideoId: video.id,

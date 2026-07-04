@@ -8,6 +8,8 @@ import { GeneratePage } from "./pages/Generate";
 import { MonetizationPage } from "./pages/Monetization";
 import { OverviewPage } from "./pages/Overview";
 import { ReviewPage } from "./pages/Review";
+import { SetupPage } from "./pages/Setup";
+import { VideoReviewPage } from "./pages/VideoReview";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -31,6 +33,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <OverviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/setup"
+        element={
+          <ProtectedRoute>
+            <SetupPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/review/:videoId"
+        element={
+          <ProtectedRoute>
+            <VideoReviewPage />
           </ProtectedRoute>
         }
       />

@@ -5,6 +5,7 @@ import {
   Clapperboard,
   Film,
   LayoutDashboard,
+  Link2,
   ListChecks,
   LogOut,
   Menu,
@@ -17,12 +18,17 @@ import { cn } from "../lib/utils";
 
 const links = [
   { to: "/", icon: LayoutDashboard, label: "Overview", short: "Home" },
+  { to: "/setup", icon: Link2, label: "Connect", short: "Setup" },
   { to: "/review", icon: ListChecks, label: "Review Queue", short: "Review" },
   { to: "/generate", icon: Clapperboard, label: "Generate", short: "Create" },
   { to: "/channels", icon: Film, label: "Channels", short: "Channels" },
   { to: "/monetization", icon: Target, label: "Monetization", short: "YPP" },
   { to: "/analytics", icon: BarChart3, label: "Analytics", short: "Stats" },
 ];
+
+const mobileBottomLinks = links.filter(
+  (link) => link.to !== "/setup" && link.to !== "/monetization",
+);
 
 function NavItems({
   onNavigate,
@@ -91,7 +97,7 @@ function MobileBottomNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-surface-border/80 bg-surface-raised/95 backdrop-blur-xl md:hidden">
       <div className="flex items-stretch justify-around px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1">
-        {links.map(({ to, icon: Icon, short }) => {
+        {mobileBottomLinks.map(({ to, icon: Icon, short }) => {
           const active =
             to === "/"
               ? location.pathname === "/"
@@ -336,8 +342,8 @@ export function DatabaseSetupBanner() {
         <li>Wait for redeploy (~1 min), then refresh this page</li>
       </ol>
       <p className="mt-3 text-xs text-amber-200/70">
-        After that, run <code className="rounded bg-black/20 px-1">npm run setup</code>{" "}
-        on your computer to register your channel.
+        Then open the <strong>Connect</strong> tab (hamburger menu on mobile) to link your YouTube channel — or run{" "}
+        <code className="rounded bg-black/20 px-1">npm run setup</code> locally.
       </p>
     </div>
   );

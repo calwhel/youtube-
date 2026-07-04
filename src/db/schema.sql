@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS videos (
   inauthenticity_risk_score NUMERIC(5, 2),
   creatomate_template_used TEXT,
   sources_cited JSONB,
+  description TEXT,
+  tags JSONB,
+  thumbnail_text TEXT,
+  short_title TEXT,
   published_at TIMESTAMPTZ
 );
 

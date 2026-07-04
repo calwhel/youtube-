@@ -14,6 +14,13 @@ export interface FinalizePublishInput {
   isManualPublish?: boolean;
 }
 
+function parseVideoTags(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+  return raw.filter((t): t is string => typeof t === "string");
+}
+
 export class PublishFinalizer {
   private readonly platform: PlatformConfig;
   private readonly channels: ChannelRepository;
@@ -37,6 +44,14 @@ export class PublishFinalizer {
 
     const serviceConfig = buildServiceConfig(this.platform, channel);
     const youtube = new YouTubeService(serviceConfig);
+
+    if (video.title && video.description) {
+      await youtube.updateVideoMetadata(input.youtubeVideoId, {
+        title: video.title,
+        description: video.description,
+        tags: parseVideoTags(video.tags),
+      });
+    }
 
     await youtube.publishVideo(input.youtubeVideoId);
 
