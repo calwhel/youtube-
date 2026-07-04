@@ -4,30 +4,62 @@ import { Film, KeyRound, Sparkles } from "lucide-react";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
+async function parseErrorResponse(response: Response): Promise<string> {
+  try {
+    const data = (await response.json()) as { error?: string };
+    if (data.error) {
+      return data.error;
+    }
+  } catch {
+    // not JSON — fall through
+  }
+  return `Server error (${response.status})`;
+}
+
 export function LoginPage() {
   const { login } = useAuth();
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    setWarning("");
     setLoading(true);
 
     try {
       const trimmed = token.trim();
-      const response = await fetch("/api/channels", {
+      if (!trimmed) {
+        throw new ApiError("Please paste your auth token", 400);
+      }
+
+      const response = await fetch("/api/auth/verify", {
         headers: { "x-auth-token": trimmed },
       });
 
       if (response.status === 401) {
-        throw new ApiError("Invalid auth token", 401);
+        throw new ApiError(
+          "Wrong token — copy AUTH_TOKEN exactly from Railway → Variables",
+          401,
+        );
       }
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new ApiError(data.error ?? "Connection failed", response.status);
+        throw new ApiError(await parseErrorResponse(response), response.status);
+      }
+
+      const data = (await response.json()) as {
+        ok?: boolean;
+        database?: string;
+        database_error?: string;
+      };
+
+      if (data.database === "disconnected") {
+        setWarning(
+          "Logged in, but database is not connected. Link Postgres DATABASE_URL in Railway, then run npm run setup.",
+        );
       }
 
       login(trimmed);
@@ -35,7 +67,7 @@ export function LoginPage() {
       setError(
         err instanceof ApiError
           ? err.message
-          : "Could not connect. Check your token and try again.",
+          : "Could not reach server — check your Railway app is running.",
       );
     } finally {
       setLoading(false);
@@ -69,6 +101,10 @@ export function LoginPage() {
               onChange={(e) => setToken(e.target.value)}
               placeholder="Paste your AUTH_TOKEN from Railway"
               className="input-field pl-10"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
               required
             />
           </div>
@@ -79,16 +115,23 @@ export function LoginPage() {
             </div>
           )}
 
+          {warning && (
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              {warning}
+            </div>
+          )}
+
           <button type="submit" disabled={loading} className="btn-primary w-full">
             <Sparkles className="h-4 w-4" />
             {loading ? "Connecting..." : "Enter Dashboard"}
           </button>
 
           <p className="mt-6 text-center text-xs leading-relaxed text-zinc-500">
-            Find your token in Railway → your app service → Variables →{" "}
+            Railway → your app → Variables → copy{" "}
             <code className="rounded bg-surface-overlay px-1.5 py-0.5 text-zinc-400">
               AUTH_TOKEN
-            </code>
+            </code>{" "}
+            exactly (no spaces)
           </p>
         </form>
       </div>

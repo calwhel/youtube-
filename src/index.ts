@@ -4,6 +4,7 @@ import path from "node:path";
 import { loadConfig } from "./config";
 import { createAuthMiddleware } from "./middleware/auth";
 import { PipelineOrchestrator } from "./pipeline";
+import { createAuthRoutes } from "./routes/auth";
 import { createChannelRoutes } from "./routes/channels";
 import {
   createPipelineRoutes,
@@ -45,6 +46,7 @@ async function main(): Promise<void> {
   app.use(express.static(publicDir));
 
   const apiRouter = express.Router();
+  createAuthRoutes(apiRouter);
   createChannelRoutes(apiRouter, platform);
   createPipelineRoutes(apiRouter, platform, orchestrator);
   app.use("/api", authenticate, apiRouter);

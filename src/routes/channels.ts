@@ -308,8 +308,13 @@ export function createChannelRoutes(
   });
 
   router.get("/channels", async (_req, res) => {
-    const channelList = await channels.listAll();
-    res.status(200).json({ channels: channelList });
+    try {
+      const channelList = await channels.listAll();
+      res.status(200).json({ channels: channelList });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
+    }
   });
 
   router.get("/channels/:id", async (req, res) => {
